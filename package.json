@@ -1,0 +1,10 @@
+{
+  "name": "gowez",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Go-native desktop application runtime — Svelte UI, no Chromium, no OS WebView.",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ]
+}

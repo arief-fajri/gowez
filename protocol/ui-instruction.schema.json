@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gowez.dev/schema/ui-instruction.v1.json",
+  "title": "GoWEZ UI Instruction",
+  "description": "Compiler-oriented UI instruction stream (Strategy B): the output of the Svelte adapter and the input of the Go UI runtime. Versioned contract — bump `version` on any breaking change (G-IFACE-02, G-IFACE-03).",
+  "type": "object",
+  "required": ["version", "ops"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Instruction schema version. Breaking changes bump this integer.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "entry": {
+      "description": "Node ID of the component root.",
+      "type": "integer"
+    },
+    "ops": {
+      "description": "Ordered list of UI operations. Applied in order; an invalid op fails the whole stream explicitly (never a partial tree).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/op" }
+    }
+  },
+  "$defs": {
+    "nodeId": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "op": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "createElement",
+            "createText",
+            "setAttribute",
+            "setStyle",
+            "setText",
+            "appendChild",
+            "removeChild",
+            "addEventListener",
+            "removeEventListener"
+          ]
+        },
+        "nodeId": { "$ref": "#/$defs/nodeId" },
+        "parentId": { "$ref": "#/$defs/nodeId" },
+        "childId": { "$ref": "#/$defs/nodeId" },
+        "tag": { "type": "string" },
+        "name": { "type": "string" },
+        "value": { "type": "string" },
+        "text": { "type": "string" },
+        "props": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "style": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "event": { "type": "string" },
+        "handlerId": { "$ref": "#/$defs/nodeId" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "createElement" } } },
+          "then": { "required": ["nodeId", "tag"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "createText" } } },
+          "then": { "required": ["nodeId", "text"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "appendChild" } } },
+          "then": { "required": ["parentId", "childId"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "removeChild" } } },
+          "then": { "required": ["parentId", "childId"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "addEventListener" } } },
+          "then": { "required": ["nodeId", "event", "handlerId"] }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gowez.dev/schema/ipc.v1.json",
+  "title": "GoWEZ IPC",
+  "description": "The only channel between UI/JavaScript and Go native APIs (internal/ipc). Every message carries the schema version; breaking changes bump `version` (G-IFACE-02, G-IFACE-03). Unknown methods fail deterministically with code -32601.",
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/response" }
+  ],
+  "$defs": {
+    "request": {
+      "type": "object",
+      "required": ["version", "id", "method"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "id": { "type": "integer", "minimum": 0 },
+        "method": {
+          "description": "Dotted operation name, e.g. \"fs.readTextFile\".",
+          "type": "string",
+          "minLength": 1
+        },
+        "params": {
+          "description": "JSON-encoded parameters.",
+          "type": ["object", "array", "null"]
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "required": ["version", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "id": { "type": "integer", "minimum": 0 },
+        "result": {
+          "description": "Success payload; present only when error is absent.",
+          "type": ["object", "array", "string", "number", "boolean", "null"]
+        },
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "description": "-32601 method not found, -32602 invalid params, -32603 internal, -32000 permission denied, -32001 timeout.",
+              "type": "integer"
+            },
+            "message": { "type": "string" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "description": "Exactly one of result or error.",
+          "oneOf": [
+            { "required": ["result"], "not": { "required": ["error"] } },
+            { "required": ["error"], "not": { "required": ["result"] } }
+          ]
+        }
+      ]
+    }
+  }
+}
