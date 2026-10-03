@@ -3,7 +3,7 @@
 **A Go-native desktop application runtime: Svelte as the UI authoring layer, Go as the application runtime, an own render pipeline — no Chromium, no OS WebView.**
 
 > **Status:** research / MVP technical validation. Not production-ready.
-> Nothing is runnable yet; see [Roadmap](#roadmap) for the milestone plan.
+> **Milestone 1 complete (2026-10-03):** native window → software renderer → text → resize, with the acceptance sample `cmd/gowez-hello`. See the [Roadmap](#roadmap) and the M1-gated boxes in [`docs/CHECKLISTS.md`](docs/CHECKLISTS.md).
 
 ## The thesis
 
@@ -63,24 +63,24 @@ Key properties:
 ```text
 gowez/
 ├── gowez.go              # public API surface (the only import apps need)
-├── cmd/                  # CLI — Milestone 7
+├── cmd/gowez-hello/      # Milestone 1 acceptance sample (packaging CLIs: M7)
 ├── internal/             # runtime (not importable by applications)
-│   ├── app/              # lifecycle, startup sequence, config
-│   ├── window/           # native window + input (per-OS build tags)
-│   ├── ui/               # UI tree, event dispatch, hit testing
-│   ├── style/            # CSS subset
-│   ├── layout/           # box + flex layout
-│   ├── text/             # fonts, shaping, fallback
-│   ├── render/           # backend-agnostic command contract
-│   │   └── backend/{software,opengl}/
-│   ├── script/           # embedded JS engine (sandboxed; Milestone 4)
-│   ├── ipc/              # UI ↔ Go dispatch (versioned, bounded)
-│   ├── permission/       # explicit grant model
-│   ├── api/              # built-in native APIs — the single door to the OS
-│   ├── assets/           # UI bundle loading
-│   └── observe/          # metrics + diagnostics
+│   ├── app/              # lifecycle, startup sequence, config (M1 ✓)
+│   ├── window/           # native window + input (M1 ✓; input dispatch M3)
+│   ├── ui/               # UI tree, event dispatch, hit testing (M2/M3)
+│   ├── style/            # CSS subset (M2)
+│   ├── layout/           # box + flex layout (M2)
+│   ├── text/             # fonts, shaping, fallback (M1 ✓)
+│   ├── render/           # backend-agnostic command contract (M1 ✓)
+│   │   └── backend/{software,opengl}/   # software M1 ✓; opengl after M1
+│   ├── script/           # embedded JS engine (sandboxed; M4)
+│   ├── ipc/              # UI ↔ Go dispatch (versioned, bounded; M4)
+│   ├── permission/       # explicit grant model (M6)
+│   ├── api/              # built-in native APIs — the single door to the OS (M6)
+│   ├── assets/           # UI bundle loading (M5)
+│   └── observe/          # metrics + diagnostics (M1 ✓ startup/frame metrics)
 ├── protocol/             # JSON Schemas: UI instructions + IPC contracts
-├── packages/adapter/     # Svelte → UI instructions (TypeScript)
+├── packages/adapter/     # Svelte → UI instructions (TypeScript; M5)
 ├── examples/counter/     # acceptance sample app (Milestone 5)
 ├── tests/{golden,integration,failure,bench}/
 ├── evidence/{experiments,records,learnings.md}
@@ -89,15 +89,15 @@ gowez/
 
 ## Roadmap
 
-| Milestone | Delivers |
-|---|---|
-| **M1** | Native window → software renderer → shapes/text → resize |
-| **M2** | UI tree, style subset, layout, hit testing |
-| **M3** | Button, mouse/keyboard events, state updates |
-| **M4** | Embedded JS engine, event binding, JS → Go API |
-| **M5** | Svelte compile pipeline, counter example, state updates |
-| **M6** | Native APIs: fs, dialog, clipboard, window control |
-| **M7** | Packaging, benchmarks vs Electron/Tauri, sample application |
+| Milestone | Delivers | Status |
+|---|---|---|
+| **M1** | Native window → software renderer → shapes/text → resize | ✅ done — 2026-10-03 ([checklist](docs/CHECKLISTS.md), [evidence](evidence/learnings.md)) |
+| **M2** | UI tree, style subset, layout, hit testing | planned |
+| **M3** | Button, mouse/keyboard events, state updates | planned |
+| **M4** | Embedded JS engine, event binding, JS → Go API | planned |
+| **M5** | Svelte compile pipeline, counter example, state updates | planned |
+| **M6** | Native APIs: fs, dialog, clipboard, window control | planned |
+| **M7** | Packaging, benchmarks vs Electron/Tauri, sample application | planned |
 
 MVP success = the 12 criteria in [`docs/CHECKLISTS.md`](docs/CHECKLISTS.md). Reaching them proves the architectural hypothesis — **not** production readiness.
 
@@ -109,6 +109,7 @@ MVP success = the 12 criteria in [`docs/CHECKLISTS.md`](docs/CHECKLISTS.md). Rea
 | [`AGENTS.md`](AGENTS.md) | Working agreement for AI coding agents — read first |
 | [`docs/`](docs/) | Platform, guard rails, failure modes, observability, checklists |
 | [`protocol/`](protocol/) | Versioned UI-instruction and IPC contracts |
+| [`evidence/`](evidence/) | Experiment records, decision records (DRRs), learnings |
 
 ## Contributing
 
@@ -117,8 +118,9 @@ Read [`AGENTS.md`](AGENTS.md) first — it defines the system-thinking loop, the
 Quick start:
 
 ```bash
-go build ./...      # framework compiles with zero external dependencies
-gofmt -l .          # must print nothing
+go build ./...              # framework compiles (pure-Go deps, no cgo)
+go run ./cmd/gowez-hello    # opens a real window (Milestone 1 sample)
+gofmt -l .                  # must print nothing
 go vet ./...
 ```
 

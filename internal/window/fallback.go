@@ -1,4 +1,4 @@
-//go:build !darwin && !windows && !linux
+//go:build !((darwin || linux || windows) && (amd64 || arm64))
 
 package window
 

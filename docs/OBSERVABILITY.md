@@ -5,25 +5,25 @@ Guard rails hold only if they can be measured. A system property may not change 
 
 ## Runtime metrics (Module 5 §5.1)
 
-| Area | Metrics | Owner package |
-|---|---|---|
-| Startup | duration, initialization failures | `internal/app`, `internal/observe` |
-| Rendering | frame time, dropped frames, render errors | `internal/render`, `internal/observe` |
-| JS | execution errors/duration, uncaught exceptions | `internal/script`, `internal/observe` |
-| IPC | invocation count, error count, duration | `internal/ipc`, `internal/observe` |
-| Resource | memory, CPU, GPU/resource failures | `internal/observe` |
+| Area | Metrics | Owner package | Wired |
+|---|---|---|---|
+| Startup | duration, initialization failures | `internal/app`, `internal/observe` | M1 ✓ (`StartupDuration`, diagnostics) |
+| Rendering | frame time, dropped frames, render errors | `internal/render`, `internal/observe` | M1 ✓ (`FrameCount`, `DroppedFrames`) |
+| JS | execution errors/duration, uncaught exceptions | `internal/script`, `internal/observe` | M4 |
+| IPC | invocation count, error count, duration | `internal/ipc`, `internal/observe` | M4 |
+| Resource | memory, CPU, GPU/resource failures | `internal/observe` | M5+ |
 
 Collection surface: `observe.Recorder` (`internal/observe`). Wiring each event happens with its milestone.
 
 ## Failure experiments (Module 5 §5.3)
 
-| ID | Experiment | Proves |
-|---|---|---|
-| A | renderer init failure | G-REL-03, no half-initialized app |
-| B | JS exception | G-REL-02, isolation |
-| C | unknown IPC method | deterministic error, bounded call |
-| D | invalid native operation | error propagation, no partial state |
-| E | resource pressure | bounded degradation |
+| ID | Experiment | Proves | Status |
+|---|---|---|---|
+| A | renderer init failure | G-REL-03, no half-initialized app | ✅ executed 2026-10-03 — [record](../evidence/experiments/2026-10-03_a_renderer-init-failure.md) |
+| B | JS exception | G-REL-02, isolation | pending (M4) |
+| C | unknown IPC method | deterministic error, bounded call | pending (M4) |
+| D | invalid native operation | error propagation, no partial state | pending (M6) |
+| E | resource pressure | bounded degradation | pending (M5+) |
 
 Location: [`tests/failure/`](../tests/failure/README.md) → records in [`evidence/experiments/`](../evidence/experiments/README.md).
 

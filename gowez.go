@@ -12,10 +12,12 @@
 // DEVELOPMENT_GUIDE.md for the roadmap.
 package gowez
 
-import "github.com/volantisfrontend/gowez/internal/app"
+import "github.com/arief-fajri/gowez/internal/app"
 
 // ErrNotImplemented is returned by entry points whose milestone has not
 // landed yet. It disappears milestone by milestone (see DEVELOPMENT_GUIDE.md).
+// Since Milestone 1, Run no longer returns it; later stubs (script, IPC,
+// native APIs) surface their own package-level errors.
 var ErrNotImplemented = app.ErrNotImplemented
 
 // Config describes the initial window and application options.
@@ -36,7 +38,9 @@ type App struct {
 // Run starts the application and blocks until the window closes.
 //
 // Startup follows a bounded sequence: any failed step aborts explicitly —
-// never a half-started application. Not implemented until Milestone 1.
+// never a half-started application. Milestone 1 brings up window +
+// software renderer + the hello scene; the remaining MVP steps (JS
+// runtime, UI bundle, UI tree, layout) arrive with their milestones.
 func Run(cfg Config) error {
 	return app.Run(app.Options{
 		Title:  cfg.Title,

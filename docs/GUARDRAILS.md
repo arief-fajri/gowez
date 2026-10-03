@@ -1,7 +1,7 @@
 # Guard Rails
 
 
-Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement mechanisms (code, test, checklist) are tracked as milestones land.
+Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement mechanisms (code, test, checklist) are tracked as milestones land. Rows marked ✅ have a live enforcement artifact as of M1 (2026-10-03).
 
 ## G-DATA — data / state integrity
 
@@ -18,7 +18,7 @@ Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement 
 |---|---|---|
 | G-DEP-01 | Dependency versions are locked or have a compatibility policy | go.mod / package-lock.json |
 | G-DEP-02 | The JS engine is never an implicit source of arbitrary native access | script sandbox tests |
-| G-DEP-03 | Renderer/window dependency failure is observable | failure experiment A |
+| G-DEP-03 | Renderer/window dependency failure is observable | ✅ failure experiment A ([record](../evidence/experiments/2026-10-03_a_renderer-init-failure.md)) |
 | G-DEP-04 | Portability-critical dependencies are documented | README + this file |
 | G-DEP-05 | No dependency may cause an operation to block forever | bounded-call tests |
 
@@ -48,8 +48,8 @@ Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement 
 |---|---|---|
 | G-REL-01 | No IPC call blocks without a bound | dispatcher deadline tests |
 | G-REL-02 | JS errors never damage the native runtime | failure experiment B |
-| G-REL-03 | Renderer failure is a bounded failure | failure experiment A |
-| G-REL-04 | Shutdown releases native resources | lifecycle tests |
+| G-REL-03 | Renderer failure is a bounded failure | ✅ failure experiment A ([record](../evidence/experiments/2026-10-03_a_renderer-init-failure.md)) |
+| G-REL-04 | Shutdown releases native resources | ✅ lifecycle + integration tests (idempotent close, present-after-close fails, SIGINT/SIGTERM → rc 0) |
 | G-REL-05 | Crashes never silently corrupt data | failure experiment D |
 
 ## G-UPG — upgrade / evolution
@@ -65,4 +65,4 @@ Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement 
 
 Record every breaking change to `protocol/` schemas or the root public API here (G-IFACE-03). Format: `YYYY-MM-DD — description — version bump old → new`.
 
-_No breaking changes yet._
+- 2026-10-03 — module path renamed `github.com/volantisfrontend/gowez` → `github.com/arief-fajri/gowez` — pre-release (no tags, no consumers), no version bump ([DRR-003](../evidence/records/2026-10-03_module-path-rename.md))

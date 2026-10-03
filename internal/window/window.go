@@ -26,7 +26,8 @@ type CloseEvent struct{}
 func (CloseEvent) isWindowEvent() {}
 
 // ResizeEvent is emitted after the window is resized; layout must rerun
-// (Module 6: resize triggers relayout).
+// (Module 6: resize triggers relayout). Width and Height are in logical
+// pixels; the pixel size is read through Window.PixelSize.
 type ResizeEvent struct {
 	Width  int
 	Height int
@@ -34,7 +35,8 @@ type ResizeEvent struct {
 
 func (ResizeEvent) isWindowEvent() {}
 
-// PointerEvent carries mouse/pointer input in window coordinates.
+// PointerEvent carries mouse/pointer input in window coordinates
+// (logical pixels).
 type PointerEvent struct {
 	X, Y   float64
 	Press  bool
@@ -43,7 +45,9 @@ type PointerEvent struct {
 
 func (PointerEvent) isWindowEvent() {}
 
-// KeyEvent carries keyboard input.
+// KeyEvent carries keyboard input. Key is the portable key name; the
+// full name table lands with Milestone 3 (unknown keys are reported as
+// "#<keycode>", never dropped silently).
 type KeyEvent struct {
 	Key      string
 	Press    bool
@@ -53,6 +57,10 @@ type KeyEvent struct {
 func (KeyEvent) isWindowEvent() {}
 
 // Window is the contract every platform backend implements.
+//
+// All methods must be called from the goroutine that created the window
+// (the OS main thread — SDL requirement); Pump and Present are
+// non-blocking and bounded (G-REL-01: no operation may block forever).
 type Window interface {
 	// Title returns the current window title.
 	Title() string
@@ -60,16 +68,30 @@ type Window interface {
 	SetTitle(title string)
 	// Size returns the current window size in logical pixels.
 	Size() (width, height int)
+	// PixelSize returns the framebuffer size in physical pixels
+	// (HiDPI-aware). Layout uses this to size the raster buffer.
+	PixelSize() (width, height int)
 	// Show makes the window visible.
 	Show()
-	// Close requests window shutdown; native resources are released
-	// predictably (invariant I12, guard rail G-REL-04).
+	// Close releases all native resources; it is safe to call more
+	// than once (invariant I12, guard rail G-REL-04).
 	Close()
-	// Events returns the window event stream.
-	Events() <-chan Event
+	// Pump drains the pending OS events and returns them in order.
+	// It never blocks and processes a bounded batch per call.
+	Pump() []Event
+	// Present uploads one frame. pixels is tightly packed RGBA8888
+	// (stride = width*4), premultiplied alpha; because the OS present
+	// path treats alpha as straight, every pixel must be opaque
+	// (A=255) — scenes paint an opaque background (Milestone 1
+	// invariant). A size mismatch against the current pixel size is
+	// resolved by stretching (1:1 when the scene lays out in pixel
+	// units).
+	Present(pixels []byte, width, height int) error
 }
 
 // New creates the platform window backend (Milestone 1).
+//
+// It must be called from the OS main thread; see package docs.
 func New(opts Options) (Window, error) {
 	return newPlatformWindow(opts)
 }

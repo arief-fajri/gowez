@@ -85,16 +85,17 @@ Your autonomy is bounded:
 ## Build
 
 ```bash
-go build ./...          # framework compiles with zero external Go dependencies
+go build ./...          # framework compiles (pure-Go deps only, no cgo)
 ```
 
-There is no runnable entrypoint yet (`cmd/` arrives Milestone 7). The public surface is the root `gowez` package only.
+Runnable acceptance sample: `go run ./cmd/gowez-hello` (Milestone 1 — complete 2026-10-03). Packaging-grade entrypoints arrive with Milestone 7. The public surface is the root `gowez` package only.
 
 ## Test
 
 ```bash
 go test ./... -count=1  # unit tests
 go test ./... -race     # required before any release-oriented change
+go test -tags integration ./tests/integration/...  # real-window checks (OS main thread)
 ```
 
 Cross-cutting suites arrive with their milestones — see [DEVELOPMENT_GUIDE.md §1](DEVELOPMENT_GUIDE.md#1-commands). Failure experiments live in `tests/failure/` and must record every run in `evidence/experiments/`. Experiments for unimplemented milestones `t.Skip` with the milestone name — never silently pass.
@@ -106,7 +107,7 @@ gofmt -l .              # must print nothing
 go vet ./...            # must be clean
 ```
 
-`golangci-lint` is not configured yet (lands with Milestone 1 code).
+`golangci-lint` is not configured yet (deliberate deferral; `gofmt` + `go vet` gate every change).
 
 ## Docs
 

@@ -3,7 +3,7 @@ package layout
 import (
 	"errors"
 
-	"github.com/volantisfrontend/gowez/internal/ui"
+	"github.com/arief-fajri/gowez/internal/ui"
 )
 
 // ErrNotImplemented is returned until the layout engine lands (Milestone 2).

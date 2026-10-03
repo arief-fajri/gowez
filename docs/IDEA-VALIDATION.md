@@ -7,7 +7,9 @@ Developers who want web-style UI (HTML/Svelte authoring) for desktop apps today 
 
 ## Evidence status
 
-Only a technical hypothesis exists. Market/user evidence is **not** collected. Milestones must not assume market demand (Module 0 §2 honesty check).
+**Technical evidence (M1, 2026-10-03):** the second half of the validation target below is proven — a pure-Go stack (no cgo) opens a native OS window, shapes and rasterizes text, and presents frames through the runtime's own software renderer ([DRR-001](../evidence/records/2026-10-03_windowing-purego-sdl3.md), [DRR-002](../evidence/records/2026-10-03_text-stack-gotext.md), [checklist](CHECKLISTS.md)). The Svelte → compile → UI-representation half remains a hypothesis until M5.
+
+Market/user evidence is **not** collected. Milestones must not assume market demand (Module 0 §2 honesty check).
 
 ## Validation target (MVP minimum)
 

@@ -1,6 +1,10 @@
 package app
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/arief-fajri/gowez/internal/observe"
+)
 
 // State is the application lifecycle state.
 type State int
@@ -38,8 +42,10 @@ func (s State) String() string {
 
 // App coordinates one application instance.
 type App struct {
-	opts  Options
-	state State
+	opts     Options
+	state    State
+	metrics  *observe.Recorder
+	reporter observe.Reporter
 }
 
 // New validates options and creates an application in StateCreated.
@@ -48,7 +54,18 @@ func New(opts Options) (*App, error) {
 	if opts.Width <= 0 || opts.Height <= 0 {
 		return nil, fmt.Errorf("app: invalid window size %dx%d", opts.Width, opts.Height)
 	}
-	return &App{opts: opts, state: StateCreated}, nil
+	return &App{
+		opts:     opts,
+		state:    StateCreated,
+		metrics:  observe.NewRecorder(),
+		reporter: NewReporter(),
+	}, nil
+}
+
+// Metrics returns the runtime measurements collected so far (Module 5
+// §5.1; P5 — behavior that is not observed is not proven).
+func (a *App) Metrics() observe.Metrics {
+	return a.metrics.Snapshot()
 }
 
 // State reports the current lifecycle state.

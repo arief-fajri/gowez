@@ -36,7 +36,7 @@ UI tree → style resolution → layout tree → render tree
         → backend → native window
 ```
 
-The `render.Renderer` interface (`internal/render/renderer.go`) is the stable boundary; backends are interchangeable (G-UPG-03). The software backend proves the contract in CI first; the OpenGL backend follows.
+The `render.Renderer` interface (`internal/render/renderer.go`) is the stable boundary; backends are interchangeable (G-UPG-03). The software backend proves the contract in CI first — proven in M1 (2026-10-03, golden tests + integration present); the OpenGL backend follows.
 
 ## Svelte strategy
 
@@ -46,16 +46,16 @@ The `render.Renderer` interface (`internal/render/renderer.go`) is the stable bo
 
 | Component | Package | Contract |
 |---|---|---|
-| Lifecycle | `internal/app` | startup sequence, state machine |
-| Window/input | `internal/window` | `Window` interface, per-OS build tags |
-| UI tree | `internal/ui` | nodes, mutation, dispatch, hit test |
-| Style subset | `internal/style` | parser → selector → computed style |
-| Layout | `internal/layout` | deterministic box/flex geometry |
-| Text | `internal/text` | load, shape, fallback |
-| Render contract | `internal/render` | `Renderer`, `Command`, `Frame` |
+| Lifecycle | `internal/app` | startup sequence, state machine (M1 ✓) |
+| Window/input | `internal/window` | `Window` interface, per-OS build tags (M1 ✓ window; input dispatch M3) |
+| UI tree | `internal/ui` | nodes, mutation, dispatch, hit test (M2/M3) |
+| Style subset | `internal/style` | parser → selector → computed style (M2) |
+| Layout | `internal/layout` | deterministic box/flex geometry (M2) |
+| Text | `internal/text` | load, shape, fallback (M1 ✓) |
+| Render contract | `internal/render` | `Renderer`, `Command`, `Frame` (M1 ✓ contract + software backend) |
 | JS engine | `internal/script` | sandboxed engine + bounded limits (M4) |
-| IPC | `internal/ipc` | versioned request/response, bounded dispatch |
-| Permission | `internal/permission` | explicit grants, deny by default |
-| Native API | `internal/api` | `Registry` — the single door to the OS |
-| Assets | `internal/assets` | bundle loader (go:embed at packaging) |
-| Observability | `internal/observe` | metrics + diagnostics |
+| IPC | `internal/ipc` | versioned request/response, bounded dispatch (M4) |
+| Permission | `internal/permission` | explicit grants, deny by default (M6) |
+| Native API | `internal/api` | `Registry` — the single door to the OS (M6) |
+| Assets | `internal/assets` | bundle loader (go:embed at packaging; M5) |
+| Observability | `internal/observe` | metrics + diagnostics (M1 ✓ startup/frame metrics) |

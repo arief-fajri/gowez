@@ -3,19 +3,21 @@
 
 A checklist item passes only with a test, an experiment record, or a documented observation behind it. A checked box without evidence is classification **E**.
 
+**M1 gate:** the boxes checked below were closed on **2026-10-03** — automated evidence (tests, golden images, experiment A) plus the operator's visual verification of `cmd/gowez-hello` (window opens, text renders, resize works, clean exit). Anything unchecked belongs to a later milestone; Release (M7) boxes are re-verified in full at release time.
+
 ## Core correctness (M1–M3)
 
-- [ ] Application starts from a clean environment
-- [ ] Native window opens
+- [x] Application starts from a clean environment — [startup sequence test](../tests/integration/window_test.go), [experiment A](../evidence/experiments/2026-10-03_a_renderer-init-failure.md)
+- [x] Native window opens — [tests/integration/window_test.go](../tests/integration/window_test.go)
 - [ ] Svelte UI loads
-- [ ] Text renders
-- [ ] Basic shapes render
+- [x] Text renders — [golden text.png](../tests/golden/testdata/text.png)
+- [x] Basic shapes render — [golden rects.png](../tests/golden/testdata/rects.png)
 - [ ] Button renders
 - [ ] Mouse click reaches UI
 - [ ] Keyboard input works
 - [ ] UI state can update
 - [ ] JS exception is observable
-- [ ] Application exits cleanly
+- [x] Application exits cleanly — window close path + SIGINT/SIGTERM → rc 0, [lifecycle.go](../internal/app/lifecycle.go), [integration test](../tests/integration/window_test.go)
 
 ## Svelte integration (M5)
 
@@ -40,11 +42,11 @@ A checklist item passes only with a test, an experiment record, or a documented 
 ## Rendering (M1/M2)
 
 - [ ] Layout produces deterministic geometry
-- [ ] Renderer receives explicit commands
-- [ ] Text renders correctly
-- [ ] Basic clipping works
+- [x] Renderer receives explicit commands — [renderer_test.go](../internal/render/backend/software/renderer_test.go)
+- [x] Text renders correctly — [golden text.png](../tests/golden/testdata/text.png)
+- [x] Basic clipping works — [renderer_test.go](../internal/render/backend/software/renderer_test.go)
 - [ ] Resize triggers relayout
-- [ ] Renderer failure is observable
+- [x] Renderer failure is observable — [experiment A](../evidence/experiments/2026-10-03_a_renderer-init-failure.md), `Pixels()` error paths in [renderer_test.go](../internal/render/backend/software/renderer_test.go)
 
 ## Security (M4/M6)
 
@@ -70,9 +72,9 @@ A checklist item passes only with a test, an experiment record, or a documented 
 The MVP counts as complete for **technical validation** when:
 
 - [ ] A Svelte application builds successfully
-- [ ] No Chromium dependency
-- [ ] No OS WebView dependency
-- [ ] The Go binary can create a native window
+- [x] No Chromium dependency — [go.mod](../go.mod) carries pure-Go deps only; `CGO_ENABLED=0 go build ./...` passes
+- [x] No OS WebView dependency — windowing via purego SDL3, [DRR-001](../evidence/records/2026-10-03_windowing-purego-sdl3.md)
+- [x] The Go binary can create a native window — `cmd/gowez-hello`, [integration test](../tests/integration/window_test.go)
 - [ ] Basic UI renders through the GPU
 - [ ] The user can interact with the UI
 - [ ] Svelte state produces UI updates

@@ -6,8 +6,8 @@ import "fmt"
 // Every failure mode in Module 2 §2.4 must produce one of these — an
 // unexplained failure is classification D (missing observability).
 type Diagnostic struct {
-	// Component names the failing subsystem: "window", "renderer",
-	// "script", "ipc", "api", "assets".
+	// Component names the failing subsystem: "font", "window",
+	// "renderer", "scene", "script", "ipc", "api", "assets".
 	Component string
 	// Message is the human-readable description.
 	Message string
@@ -23,8 +23,9 @@ func (d Diagnostic) String() string {
 	return fmt.Sprintf("[%s] %s", d.Component, d.Message)
 }
 
-// Reporter receives diagnostics. Production wiring lands with Milestone 1;
-// until then failures still return errors to their callers.
+// Reporter receives diagnostics. The application runtime wires
+// StderrReporter (Milestone 1); failures always also return errors to
+// their callers.
 type Reporter interface {
 	// Report delivers one diagnostic.
 	Report(Diagnostic)

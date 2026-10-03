@@ -3,7 +3,7 @@ package opengl
 import (
 	"errors"
 
-	"github.com/volantisfrontend/gowez/internal/render"
+	"github.com/arief-fajri/gowez/internal/render"
 )
 
 // ErrNotImplemented is returned until the GPU backend lands, after the
