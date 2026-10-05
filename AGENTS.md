@@ -77,7 +77,7 @@ Your autonomy is bounded:
 
 - **Idea validation:** [docs/IDEA-VALIDATION.md](docs/IDEA-VALIDATION.md) — problem, evidence status, risks, decision
 - **Architecture:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **Contracts:** [protocol/ui-instruction.schema.json](protocol/ui-instruction.schema.json), [protocol/ipc.schema.json](protocol/ipc.schema.json)
+- **Contracts:** [protocol/ui-instruction.schema.json](protocol/ui-instruction.schema.json), [protocol/ipc.schema.json](protocol/ipc.schema.json), [docs/CSS-SUBSET.md](docs/CSS-SUBSET.md)
 - **Commands & conventions:** [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) (single source of truth)
 - **Guard rails:** [docs/GUARDRAILS.md](docs/GUARDRAILS.md)
 - **Roadmap:** [README.md](README.md#roadmap)
@@ -88,7 +88,7 @@ Your autonomy is bounded:
 go build ./...          # framework compiles (pure-Go deps only, no cgo)
 ```
 
-Runnable acceptance sample: `go run ./cmd/gowez-hello` (Milestone 1 — complete 2026-10-03). Packaging-grade entrypoints arrive with Milestone 7. The public surface is the root `gowez` package only.
+Runnable acceptance sample: `go run ./cmd/gowez-hello` (Milestone 1 complete 2026-10-03; Milestone 2 UI scene 2026-10-05). Packaging-grade entrypoints arrive with Milestone 7. The public surface is the root `gowez` package only.
 
 ## Test
 
@@ -120,9 +120,10 @@ go vet ./...            # must be clean
 - `gowez.go` — the entire public API (`Config`, `App`, `Run`, `ErrNotImplemented`)
 - `internal/app` — lifecycle state machine, startup sequence, config
 - `internal/window` — window contract; per-OS backends via build tags
-- `internal/ui` — UI tree, event dispatch, hit testing
-- `internal/style` — CSS subset (parser, selectors, computed style)
-- `internal/layout` — box + flex layout, deterministic geometry
+- `internal/ui` — UI tree, geometry, hit testing (M2 ✓; event dispatch M3)
+- `internal/style` — CSS subset (parser, selectors, resolve; M2 ✓, spec in `docs/CSS-SUBSET.md`)
+- `internal/layout` — box + flex layout, deterministic geometry (M2 ✓)
+- `internal/paint` — tree + styles + geometry → render commands (M2 ✓)
 - `internal/text` — font loading, shaping, fallback
 - `internal/render` — backend-agnostic `Renderer` contract + commands
 - `internal/render/backend/software` — CPU reference backend (first, for CI/tests)

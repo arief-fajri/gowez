@@ -23,8 +23,27 @@ type Node struct {
 	Tag string
 	// Text is the content (text nodes only).
 	Text string
+	// Attrs are the node's attributes ("class", "id", "style", …).
+	// Lazily allocated; nil means no attributes.
+	Attrs map[string]string
 	// Parent is the owning node; nil for roots.
 	Parent *Node
 	// Children are child nodes in document order.
 	Children []*Node
+}
+
+// SetAttribute sets attribute name to value, replacing any previous value.
+func (n *Node) SetAttribute(name, value string) {
+	if n.Attrs == nil {
+		n.Attrs = make(map[string]string, 2)
+	}
+	n.Attrs[name] = value
+}
+
+// GetAttribute returns the value of attribute name, or "" when absent.
+func (n *Node) GetAttribute(name string) string {
+	if n.Attrs == nil {
+		return ""
+	}
+	return n.Attrs[name]
 }

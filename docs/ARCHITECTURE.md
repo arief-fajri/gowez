@@ -48,9 +48,10 @@ The `render.Renderer` interface (`internal/render/renderer.go`) is the stable bo
 |---|---|---|
 | Lifecycle | `internal/app` | startup sequence, state machine (M1 ✓) |
 | Window/input | `internal/window` | `Window` interface, per-OS build tags (M1 ✓ window; input dispatch M3) |
-| UI tree | `internal/ui` | nodes, mutation, dispatch, hit test (M2/M3) |
-| Style subset | `internal/style` | parser → selector → computed style (M2) |
-| Layout | `internal/layout` | deterministic box/flex geometry (M2) |
+| UI tree | `internal/ui` | nodes, mutation, geometry, hit test (M2 ✓; dispatch M3) |
+| Style subset | `internal/style` | parser → selector → computed style (M2 ✓, [spec](CSS-SUBSET.md)) |
+| Layout | `internal/layout` | deterministic box/flex geometry (M2 ✓) |
+| Paint | `internal/paint` | tree + styles + geometry → render commands (M2 ✓) |
 | Text | `internal/text` | load, shape, fallback (M1 ✓) |
 | Render contract | `internal/render` | `Renderer`, `Command`, `Frame` (M1 ✓ contract + software backend) |
 | JS engine | `internal/script` | sandboxed engine + bounded limits (M4) |

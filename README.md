@@ -3,7 +3,8 @@
 **A Go-native desktop application runtime: Svelte as the UI authoring layer, Go as the application runtime, an own render pipeline — no Chromium, no OS WebView.**
 
 > **Status:** research / MVP technical validation. Not production-ready.
-> **Milestone 1 complete (2026-10-03):** native window → software renderer → text → resize, with the acceptance sample `cmd/gowez-hello`. See the [Roadmap](#roadmap) and the M1-gated boxes in [`docs/CHECKLISTS.md`](docs/CHECKLISTS.md).
+> **Milestone 1 complete (2026-10-03):** native window → software renderer → text → resize, with the acceptance sample `cmd/gowez-hello`.
+> **Milestone 2 complete (2026-10-05):** UI tree → CSS subset → block/flex layout → hit testing → paint, with a live UI scene in `cmd/gowez-hello` and the [CSS subset spec](docs/CSS-SUBSET.md). See the [Roadmap](#roadmap) and the gated boxes in [`docs/CHECKLISTS.md`](docs/CHECKLISTS.md).
 
 ## The thesis
 
@@ -67,10 +68,11 @@ gowez/
 ├── internal/             # runtime (not importable by applications)
 │   ├── app/              # lifecycle, startup sequence, config (M1 ✓)
 │   ├── window/           # native window + input (M1 ✓; input dispatch M3)
-│   ├── ui/               # UI tree, event dispatch, hit testing (M2/M3)
-│   ├── style/            # CSS subset (M2)
-│   ├── layout/           # box + flex layout (M2)
+│   ├── ui/               # UI tree, geometry, hit testing (M2 ✓; event dispatch M3)
+│   ├── style/            # CSS subset (M2 ✓ — docs/CSS-SUBSET.md)
+│   ├── layout/           # box + flex layout (M2 ✓)
 │   ├── text/             # fonts, shaping, fallback (M1 ✓)
+│   ├── paint/            # tree + styles + layout → render commands (M2 ✓)
 │   ├── render/           # backend-agnostic command contract (M1 ✓)
 │   │   └── backend/{software,opengl}/   # software M1 ✓; opengl after M1
 │   ├── script/           # embedded JS engine (sandboxed; M4)
@@ -92,7 +94,7 @@ gowez/
 | Milestone | Delivers | Status |
 |---|---|---|
 | **M1** | Native window → software renderer → shapes/text → resize | ✅ done — 2026-10-03 ([checklist](docs/CHECKLISTS.md), [evidence](evidence/learnings.md)) |
-| **M2** | UI tree, style subset, layout, hit testing | planned |
+| **M2** | UI tree, style subset, layout, hit testing | ✅ done — 2026-10-05 ([checklist](docs/CHECKLISTS.md), [CSS subset](docs/CSS-SUBSET.md), [evidence](evidence/learnings.md)) |
 | **M3** | Button, mouse/keyboard events, state updates | planned |
 | **M4** | Embedded JS engine, event binding, JS → Go API | planned |
 | **M5** | Svelte compile pipeline, counter example, state updates | planned |

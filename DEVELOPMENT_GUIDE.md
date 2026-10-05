@@ -44,7 +44,7 @@ gofmt -l .              # must print nothing
 go vet ./...            # must be clean
 ```
 
-`golangci-lint` is intentionally not configured yet (deliberate deferral; `gofmt` + `go vet` gate M1). Formatting rules: `gofmt` defaults, tab indentation, grouped imports (stdlib first, then module packages).
+`golangci-lint` is intentionally not configured yet (deliberate deferral; `gofmt` + `go vet` gate every change). Formatting rules: `gofmt` defaults, tab indentation, grouped imports (stdlib first, then module packages).
 
 ### JavaScript workspace
 
@@ -64,7 +64,7 @@ Create and touch only what the current milestone needs. The full tree exists as 
 | Milestone | Packages | Status |
 |---|---|---|
 | **M1** Window + renderer | `internal/app`, `internal/window`, `internal/text`, `internal/render` (+ `backend/software`), `internal/observe` | ✅ done 2026-10-03 (OpenGL backend follows as a separate step, after the software backend proves the contract) |
-| **M2** UI tree | `internal/ui`, `internal/layout`, `internal/style` | planned |
+| **M2** UI tree | `internal/ui`, `internal/layout`, `internal/style`, `internal/paint` | ✅ done 2026-10-05 (subset spec: `docs/CSS-SUBSET.md`) |
 | **M3** Interaction | `internal/ui` (events, hit testing), `internal/window` (input) | planned |
 | **M4** JavaScript | `internal/script`, `internal/ipc`, `protocol/ipc.schema.json` | planned |
 | **M5** Svelte | `packages/adapter`, `internal/assets`, `examples/counter`, `protocol/ui-instruction.schema.json` | planned |

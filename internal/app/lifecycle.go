@@ -46,8 +46,8 @@ var (
 //
 // Every step must either succeed or abort with an explicit diagnostic;
 // a partially initialized application never reaches ready state.
-// Remaining steps of the full MVP sequence (JS runtime, UI bundle, UI
-// tree, layout) arrive with their own milestones.
+// Remaining steps of the full MVP sequence (JS runtime, UI bundle)
+// arrive with their own milestones.
 func Run(opts Options) error {
 	start := time.Now()
 	a, err := New(opts)
@@ -92,7 +92,7 @@ func (a *App) execute(start time.Time) error {
 	defer win.Close()
 
 	rend := software.New()
-	scene, err := newHelloScene()
+	scene, err := newUIScene(a.metrics)
 	if err != nil {
 		return a.fail("scene", "scene initialization failed", err)
 	}
@@ -116,7 +116,7 @@ func (a *App) execute(start time.Time) error {
 // ignored, so the runtime installs its own handler — otherwise the
 // process can only be killed with SIGKILL). It aborts with a reported
 // diagnostic on any present failure.
-func (a *App) loop(win window.Window, rend *software.Renderer, scene *helloScene, from time.Time) error {
+func (a *App) loop(win window.Window, rend *software.Renderer, scene *uiScene, from time.Time) error {
 	// Buffered so a signal arriving mid-frame is never lost; signal.Stop
 	// on return restores default handling.
 	sigCh := make(chan os.Signal, 1)
@@ -152,14 +152,14 @@ func (a *App) loop(win window.Window, rend *software.Renderer, scene *helloScene
 			return nil
 		}
 
-		logicalW, _ := win.Size()
+		logicalW, logicalH := win.Size()
 		pw, ph := win.PixelSize()
-		if pw <= 0 || ph <= 0 || logicalW <= 0 {
+		if pw <= 0 || ph <= 0 || logicalW <= 0 || logicalH <= 0 {
 			continue // minimized or not yet mapped: keep looping, present nothing
 		}
 
 		rend.BeginFrame(pw, ph)
-		if err := scene.Draw(rend, pw, ph, logicalW); err != nil {
+		if err := scene.Draw(rend, pw, ph, logicalW, logicalH); err != nil {
 			return a.fail("scene", "scene draw failed", err)
 		}
 		rend.EndFrame()
