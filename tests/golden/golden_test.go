@@ -20,8 +20,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/arief-fajri/gowez/internal/layout"
+	"github.com/arief-fajri/gowez/internal/paint"
 	"github.com/arief-fajri/gowez/internal/render"
 	"github.com/arief-fajri/gowez/internal/render/backend/software"
+	"github.com/arief-fajri/gowez/internal/style"
+	"github.com/arief-fajri/gowez/internal/ui"
 )
 
 var update = flag.Bool("update", false, "rewrite golden PNG files")
@@ -140,4 +144,78 @@ func TestDeterminism(t *testing.T) {
 	if !bytes.Equal(a, b) {
 		t.Fatal("two renders of identical commands differ")
 	}
+}
+
+// uiScene drives the full Milestone 2 pipeline — UI tree → style →
+// layout → paint — into the renderer. It exercises block stacking, word
+// wrapping, a flex row with space-between, and a static button (the
+// "Button renders" checklist box).
+func uiScene(t *testing.T, r render.Renderer) {
+	t.Helper()
+	tree := ui.NewTree()
+	mk := func(parent *ui.Node, tag string) *ui.Node {
+		n := tree.CreateElement(tag)
+		if parent == nil {
+			if err := tree.AppendRoot(n); err != nil {
+				t.Fatal(err)
+			}
+		} else if err := tree.Append(parent, n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	txt := func(parent *ui.Node, s string) *ui.Node {
+		n := tree.CreateText(s)
+		if err := tree.Append(parent, n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	wrapper := mk(nil, "wrapper")
+	card := mk(wrapper, "card")
+	title := mk(card, "title")
+	txt(title, "GoWEZ UI")
+	txt(card, "Layout, style, and paint run without Chromium — this paragraph wraps inside its content box.")
+	row := mk(card, "row")
+	mk(row, "swatch-blue")
+	mk(row, "swatch-orange")
+	button := mk(row, "button")
+	txt(button, "Apply")
+
+	// color and font-size inherit (docs/CSS-SUBSET.md), so the card's
+	// text style reaches every text node; button and title override.
+	const css = `
+wrapper { background-color: #14161c; padding: 24px; height: 400px; }
+card { background-color: #1e2028; padding: 16px; border-width: 1px; border-color: #333945; color: #a8b0c0; font-size: 13px; }
+title { color: #ffffff; font-size: 22px; }
+row { display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 44px; }
+swatch-blue { background-color: #2f6feb; width: 120px; height: 40px; }
+swatch-orange { background-color: #e0873a; width: 80px; height: 40px; }
+button { background-color: #2b303b; border-width: 2px; border-color: #4c8dff; padding: 6px 12px; color: #ffffff; font-size: 14px; }
+`
+	sheet, err := style.Parse(css)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	styles, err := style.Resolve(tree.Roots(), sheet)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	res, err := layout.Layout(tree.Roots(), styles, ui.Size{W: 640, H: 400})
+	if err != nil {
+		t.Fatalf("Layout: %v", err)
+	}
+	if err := paint.Draw(r, tree.Roots(), res, styles, 1); err != nil {
+		t.Fatalf("Draw: %v", err)
+	}
+}
+
+// TestUI pins the Milestone 2 pipeline's pixels: card, wrapped text,
+// flex row, and button.
+func TestUI(t *testing.T) {
+	got := run(t, func(r render.Renderer) {
+		r.BeginFrame(640, 400)
+		uiScene(t, r)
+	})
+	checkGolden(t, "ui", got)
 }

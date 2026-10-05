@@ -7,7 +7,7 @@ Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement 
 
 | ID | Guard rail | Enforcement (planned) |
 |---|---|---|
-| G-DATA-01 | Atomic state updates have an explicit boundary | ui/app transaction tests |
+| G-DATA-01 | Atomic state updates have an explicit boundary | ✅ ui tree mutation tests ([tree_test.go](../internal/ui/tree_test.go), [ui_test.go](../internal/ui/ui_test.go)) |
 | G-DATA-02 | Failed operations never partially apply state | failure experiment D |
 | G-DATA-03 | Persisted state has a format/version | M6 persistence tests |
 | G-DATA-04 | Destructive native operations require an explicit API call | api/registry review + tests |
@@ -59,7 +59,7 @@ Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement 
 | G-UPG-01 | Runtime API changes are documented | this file + README |
 | G-UPG-02 | The Svelte compatibility range is tested | M5 integration tests |
 | G-UPG-03 | Renderer backends are swappable without changing the UI API | dual-backend tests (software + opengl) |
-| G-UPG-04 | Divergence from browser semantics is documented | adapter docs |
+| G-UPG-04 | Divergence from browser semantics is documented | ✅ CSS subset divergence ([CSS-SUBSET.md](CSS-SUBSET.md)) + style errors carry `style: line X:Y` ([style_test.go](../internal/style/style_test.go)); browser API docs → adapter (M5) |
 
 ## Changelog
 

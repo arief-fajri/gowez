@@ -1,6 +1,7 @@
-// Command gowez-hello is the Milestone 1 acceptance sample: a native
-// window, a software-rasterized scene, and live shaped text — no
-// Chromium, no WebView, no cgo.
+// Command gowez-hello is the acceptance sample: a native window with
+// the Milestone 2 UI scene — UI tree → CSS subset → block/flex layout →
+// paint — rasterized by the software backend. No Chromium, no WebView,
+// no cgo.
 //
 // It blocks until the window is closed; any startup or present failure
 // prints a diagnostic and exits non-zero.

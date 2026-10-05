@@ -9,6 +9,10 @@ import (
 type Metrics struct {
 	// StartupDuration is time from Run to ready state.
 	StartupDuration time.Duration
+	// LayoutCount is the number of completed layout passes.
+	LayoutCount uint64
+	// LastLayoutDuration is the duration of the most recent layout pass.
+	LastLayoutDuration time.Duration
 	// FrameCount is the number of completed frames.
 	FrameCount uint64
 	// DroppedFrames is frames that exceeded the budget.
@@ -38,6 +42,14 @@ func (r *Recorder) RecordStartup(d time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.m.StartupDuration = d
+}
+
+// RecordLayout counts one layout pass and stores its duration.
+func (r *Recorder) RecordLayout(d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.m.LayoutCount++
+	r.m.LastLayoutDuration = d
 }
 
 // RecordFrame counts one completed frame, flagged as dropped when it

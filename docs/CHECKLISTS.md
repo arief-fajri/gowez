@@ -5,6 +5,8 @@ A checklist item passes only with a test, an experiment record, or a documented 
 
 **M1 gate:** the boxes checked below were closed on **2026-10-03** — automated evidence (tests, golden images, experiment A) plus the operator's visual verification of `cmd/gowez-hello` (window opens, text renders, resize works, clean exit). Anything unchecked belongs to a later milestone; Release (M7) boxes are re-verified in full at release time.
 
+**M2 gate:** the boxes checked below were closed on **2026-10-05** — automated evidence (style/layout/ui/app tests, golden `ui.png`, resize→relayout test) plus a smoke run of `cmd/gowez-hello` (window opens, M2 scene paints, SIGTERM → rc 0). Operator visual verification of the live scene: confirmed 2026-10-05 (scene paints; "Apply" label centered after the `align-items` subtree fix — [learnings](../evidence/learnings.md)). Subset spec: [docs/CSS-SUBSET.md](CSS-SUBSET.md).
+
 ## Core correctness (M1–M3)
 
 - [x] Application starts from a clean environment — [startup sequence test](../tests/integration/window_test.go), [experiment A](../evidence/experiments/2026-10-03_a_renderer-init-failure.md)
@@ -12,7 +14,7 @@ A checklist item passes only with a test, an experiment record, or a documented 
 - [ ] Svelte UI loads
 - [x] Text renders — [golden text.png](../tests/golden/testdata/text.png)
 - [x] Basic shapes render — [golden rects.png](../tests/golden/testdata/rects.png)
-- [ ] Button renders
+- [x] Button renders — [golden ui.png](../tests/golden/testdata/ui.png) ("Apply" button in the M2 scene), [uiscene.go](../internal/app/uiscene.go)
 - [ ] Mouse click reaches UI
 - [ ] Keyboard input works
 - [ ] UI state can update
@@ -41,11 +43,11 @@ A checklist item passes only with a test, an experiment record, or a documented 
 
 ## Rendering (M1/M2)
 
-- [ ] Layout produces deterministic geometry
+- [x] Layout produces deterministic geometry — [layout_test.go](../internal/layout/layout_test.go) (`TestLayoutDeterministic`)
 - [x] Renderer receives explicit commands — [renderer_test.go](../internal/render/backend/software/renderer_test.go)
 - [x] Text renders correctly — [golden text.png](../tests/golden/testdata/text.png)
 - [x] Basic clipping works — [renderer_test.go](../internal/render/backend/software/renderer_test.go)
-- [ ] Resize triggers relayout
+- [x] Resize triggers relayout — [uiscene_test.go](../internal/app/uiscene_test.go) (`TestUISceneRelayout`)
 - [x] Renderer failure is observable — [experiment A](../evidence/experiments/2026-10-03_a_renderer-init-failure.md), `Pixels()` error paths in [renderer_test.go](../internal/render/backend/software/renderer_test.go)
 
 ## Security (M4/M6)

@@ -39,8 +39,9 @@ type App struct {
 //
 // Startup follows a bounded sequence: any failed step aborts explicitly —
 // never a half-started application. Milestone 1 brings up window +
-// software renderer + the hello scene; the remaining MVP steps (JS
-// runtime, UI bundle, UI tree, layout) arrive with their milestones.
+// software renderer; Milestone 2 adds the UI runtime (tree, style,
+// layout, paint) behind the built-in demo scene. The remaining MVP
+// steps (JS runtime, UI bundle) arrive with their milestones.
 func Run(cfg Config) error {
 	return app.Run(app.Options{
 		Title:  cfg.Title,
