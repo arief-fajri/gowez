@@ -7,7 +7,7 @@ import "fmt"
 // unexplained failure is classification D (missing observability).
 type Diagnostic struct {
 	// Component names the failing subsystem: "font", "window",
-	// "renderer", "scene", "script", "ipc", "api", "assets".
+	// "renderer", "scene", "ui", "script", "ipc", "api", "assets".
 	Component string
 	// Message is the human-readable description.
 	Message string

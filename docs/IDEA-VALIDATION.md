@@ -7,7 +7,13 @@ Developers who want web-style UI (HTML/Svelte authoring) for desktop apps today 
 
 ## Evidence status
 
-**Technical evidence (M1, 2026-10-03):** the second half of the validation target below is proven — a pure-Go stack (no cgo) opens a native OS window, shapes and rasterizes text, and presents frames through the runtime's own software renderer ([DRR-001](../evidence/records/2026-10-03_windowing-purego-sdl3.md), [DRR-002](../evidence/records/2026-10-03_text-stack-gotext.md), [checklist](CHECKLISTS.md)). The Svelte → compile → UI-representation half remains a hypothesis until M5.
+**Technical evidence (M1, 2026-10-03):** the second half of the validation target below is proven — a pure-Go stack (no cgo) opens a native OS window, shapes and rasterizes text, and presents frames through the runtime's own software renderer ([DRR-001](../evidence/records/2026-10-03_windowing-purego-sdl3.md), [DRR-002](../evidence/records/2026-10-03_text-stack-gotext.md), [checklist](CHECKLISTS.md)).
+
+**UI runtime (M2, 2026-10-05):** the middle of the target — `UI representation → Go runtime → UI tree/layout → renderer` — is proven end to end: UI tree, CSS subset, block/flex layout, and paint, pinned by golden `tests/golden/testdata/ui.png` ([CSS subset](CSS-SUBSET.md), [checklist](CHECKLISTS.md)).
+
+**Interaction (M3, 2026-10-06):** input → hit test → event dispatch → handler → state update → re-layout works in the live scene (mouse, keyboard, `:hover`/`:active`/`:focus`, focus traversal), pinned by golden `tests/golden/testdata/ui-state.png`; operator visual verification confirmed 2026-10-06 ([EVENTS](EVENTS.md), [checklist](CHECKLISTS.md)).
+
+The Svelte → compile → UI-representation half remains a hypothesis until M5.
 
 Market/user evidence is **not** collected. Milestones must not assume market demand (Module 0 §2 honesty check).
 

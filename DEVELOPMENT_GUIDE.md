@@ -65,7 +65,7 @@ Create and touch only what the current milestone needs. The full tree exists as 
 |---|---|---|
 | **M1** Window + renderer | `internal/app`, `internal/window`, `internal/text`, `internal/render` (+ `backend/software`), `internal/observe` | ✅ done 2026-10-03 (OpenGL backend follows as a separate step, after the software backend proves the contract) |
 | **M2** UI tree | `internal/ui`, `internal/layout`, `internal/style`, `internal/paint` | ✅ done 2026-10-05 (subset spec: `docs/CSS-SUBSET.md`) |
-| **M3** Interaction | `internal/ui` (events, hit testing), `internal/window` (input) | planned |
+| **M3** Interaction | `internal/ui` (events, hit testing), `internal/window` (input) | ✅ done 2026-10-06 ([EVENTS](docs/EVENTS.md)) |
 | **M4** JavaScript | `internal/script`, `internal/ipc`, `protocol/ipc.schema.json` | planned |
 | **M5** Svelte | `packages/adapter`, `internal/assets`, `examples/counter`, `protocol/ui-instruction.schema.json` | planned |
 | **M6** Native API | `internal/api`, `internal/permission` | planned |

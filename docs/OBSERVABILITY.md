@@ -10,6 +10,7 @@ Guard rails hold only if they can be measured. A system property may not change 
 | Startup | duration, initialization failures | `internal/app`, `internal/observe` | M1 ✓ (`StartupDuration`, diagnostics) |
 | Rendering | frame time, dropped frames, render errors | `internal/render`, `internal/observe` | M1 ✓ (`FrameCount`, `DroppedFrames`) |
 | Layout | pass count, last pass duration | `internal/app`, `internal/observe` | M2 ✓ (`LayoutCount`, `LastLayoutDuration`) |
+| Input | input events, dispatched handlers, unhandled events, recovered handler panics | `internal/app`, `internal/ui`, `internal/observe` | M3 ✓ (`InputEvents`, `DispatchedEvents`, `UnhandledEvents`, `HandlerPanics`) |
 | JS | execution errors/duration, uncaught exceptions | `internal/script`, `internal/observe` | M4 |
 | IPC | invocation count, error count, duration | `internal/ipc`, `internal/observe` | M4 |
 | Resource | memory, CPU, GPU/resource failures | `internal/observe` | M5+ |

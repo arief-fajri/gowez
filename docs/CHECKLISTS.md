@@ -7,6 +7,8 @@ A checklist item passes only with a test, an experiment record, or a documented 
 
 **M2 gate:** the boxes checked below were closed on **2026-10-05** — automated evidence (style/layout/ui/app tests, golden `ui.png`, resize→relayout test) plus a smoke run of `cmd/gowez-hello` (window opens, M2 scene paints, SIGTERM → rc 0). Operator visual verification of the live scene: confirmed 2026-10-05 (scene paints; "Apply" label centered after the `align-items` subtree fix — [learnings](../evidence/learnings.md)). Subset spec: [docs/CSS-SUBSET.md](CSS-SUBSET.md).
 
+**M3 gate:** the boxes checked below were closed on **2026-10-06** — automated evidence ([input_test.go](../internal/app/input_test.go), [interaction_test.go](../internal/ui/interaction_test.go), [sdl_test.go](../internal/window/sdl_test.go), [golden ui-state.png](../tests/golden/testdata/ui-state.png)) plus a smoke run of `cmd/gowez-hello`. Event semantics: [docs/EVENTS.md](EVENTS.md).
+
 ## Core correctness (M1–M3)
 
 - [x] Application starts from a clean environment — [startup sequence test](../tests/integration/window_test.go), [experiment A](../evidence/experiments/2026-10-03_a_renderer-init-failure.md)
@@ -15,9 +17,9 @@ A checklist item passes only with a test, an experiment record, or a documented 
 - [x] Text renders — [golden text.png](../tests/golden/testdata/text.png)
 - [x] Basic shapes render — [golden rects.png](../tests/golden/testdata/rects.png)
 - [x] Button renders — [golden ui.png](../tests/golden/testdata/ui.png) ("Apply" button in the M2 scene), [uiscene.go](../internal/app/uiscene.go)
-- [ ] Mouse click reaches UI
-- [ ] Keyboard input works
-- [ ] UI state can update
+- [x] Mouse click reaches UI — [input_test.go](../internal/app/input_test.go) (`TestLoopDispatchesInput`, `TestSceneClickUpdatesState`), [interaction_test.go](../internal/ui/interaction_test.go)
+- [x] Keyboard input works — [input_test.go](../internal/app/input_test.go) (`TestSceneKeyEchoUpdatesStatus`), [interaction_test.go](../internal/ui/interaction_test.go) (`TestTabTraversalWraps`, `TestEnterSpaceActivatesFocusedButton`)
+- [x] UI state can update — [input_test.go](../internal/app/input_test.go) (`TestSceneClickUpdatesState`: click → text change → dirty → relayout), [golden ui-state.png](../tests/golden/testdata/ui-state.png)
 - [ ] JS exception is observable
 - [x] Application exits cleanly — window close path + SIGINT/SIGTERM → rc 0, [lifecycle.go](../internal/app/lifecycle.go), [integration test](../tests/integration/window_test.go)
 
@@ -78,7 +80,7 @@ The MVP counts as complete for **technical validation** when:
 - [x] No OS WebView dependency — windowing via purego SDL3, [DRR-001](../evidence/records/2026-10-03_windowing-purego-sdl3.md)
 - [x] The Go binary can create a native window — `cmd/gowez-hello`, [integration test](../tests/integration/window_test.go)
 - [ ] Basic UI renders through the GPU
-- [ ] The user can interact with the UI
+- [x] The user can interact with the UI — click/keyboard/state via [input_test.go](../internal/app/input_test.go) + [EVENTS.md](EVENTS.md) semantics; interactive scene in [uiscene.go](../internal/app/uiscene.go)
 - [ ] Svelte state produces UI updates
 - [ ] JS can call explicit Go APIs
 - [ ] Go APIs can access at least one native capability

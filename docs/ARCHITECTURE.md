@@ -47,8 +47,8 @@ The `render.Renderer` interface (`internal/render/renderer.go`) is the stable bo
 | Component | Package | Contract |
 |---|---|---|
 | Lifecycle | `internal/app` | startup sequence, state machine (M1 ✓) |
-| Window/input | `internal/window` | `Window` interface, per-OS build tags (M1 ✓ window; input dispatch M3) |
-| UI tree | `internal/ui` | nodes, mutation, geometry, hit test (M2 ✓; dispatch M3) |
+| Window/input | `internal/window` | `Window` interface, per-OS build tags (M1 ✓ window; M3 ✓ input dispatch) |
+| UI tree | `internal/ui` | nodes, mutation, geometry, hit test, event dispatch, focus (M2–M3 ✓) |
 | Style subset | `internal/style` | parser → selector → computed style (M2 ✓, [spec](CSS-SUBSET.md)) |
 | Layout | `internal/layout` | deterministic box/flex geometry (M2 ✓) |
 | Paint | `internal/paint` | tree + styles + geometry → render commands (M2 ✓) |
@@ -59,4 +59,4 @@ The `render.Renderer` interface (`internal/render/renderer.go`) is the stable bo
 | Permission | `internal/permission` | explicit grants, deny by default (M6) |
 | Native API | `internal/api` | `Registry` — the single door to the OS (M6) |
 | Assets | `internal/assets` | bundle loader (go:embed at packaging; M5) |
-| Observability | `internal/observe` | metrics + diagnostics (M1 ✓ startup/frame metrics) |
+| Observability | `internal/observe` | metrics + diagnostics (M1 ✓ startup/frame; M3 ✓ input metrics) |

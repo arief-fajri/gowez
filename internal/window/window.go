@@ -35,8 +35,30 @@ type ResizeEvent struct {
 
 func (ResizeEvent) isWindowEvent() {}
 
+// Pointer button identifiers (portable numbering; matches the SDL
+// values the backend maps from). Only ButtonLeft drives click
+// synthesis (docs/EVENTS.md).
+const (
+	ButtonLeft   = 1
+	ButtonMiddle = 2
+	ButtonRight  = 3
+)
+
+// Modifier bits for KeyEvent.Modifier — a portable subset instead of
+// the platform's raw modifier mask (docs/EVENTS.md).
+const (
+	ModShift = 1 << iota
+	ModCtrl
+	ModAlt
+	ModMeta
+)
+
 // PointerEvent carries mouse/pointer input in window coordinates
-// (logical pixels).
+// (logical pixels — the same space layout and hit testing use).
+//
+// Press/Button are meaningful only on button events: motion events
+// carry Press=false and Button=0, because the press edge is defined
+// exclusively by a button down event (docs/EVENTS.md).
 type PointerEvent struct {
 	X, Y   float64
 	Press  bool
@@ -45,13 +67,15 @@ type PointerEvent struct {
 
 func (PointerEvent) isWindowEvent() {}
 
-// KeyEvent carries keyboard input. Key is the portable key name; the
-// full name table lands with Milestone 3 (unknown keys are reported as
-// "#<keycode>", never dropped silently).
+// KeyEvent carries keyboard input. Key is the portable key name
+// (docs/EVENTS.md §key naming — unknown keys are reported as
+// "#<keycode>", never dropped silently); Modifier is a ModShift|ModCtrl
+// |ModAlt|ModMeta bitfield; Repeat reports an OS key-repeat press.
 type KeyEvent struct {
 	Key      string
 	Press    bool
 	Modifier int
+	Repeat   bool
 }
 
 func (KeyEvent) isWindowEvent() {}

@@ -169,7 +169,9 @@ func mapEvent(ev *sdl.Event) (Event, bool) {
 
 	case sdl.EVENT_MOUSE_MOTION:
 		if m := ev.MouseMotionEvent(); m != nil {
-			return PointerEvent{X: float64(m.X), Y: float64(m.Y), Press: m.State != 0}, true
+			// Motion never carries a press edge: press state is
+			// defined only by button down/up events (docs/EVENTS.md).
+			return PointerEvent{X: float64(m.X), Y: float64(m.Y)}, true
 		}
 
 	case sdl.EVENT_MOUSE_BUTTON_DOWN, sdl.EVENT_MOUSE_BUTTON_UP:
@@ -179,18 +181,39 @@ func mapEvent(ev *sdl.Event) (Event, bool) {
 
 	case sdl.EVENT_KEY_DOWN, sdl.EVENT_KEY_UP:
 		if k := ev.KeyboardEvent(); k != nil {
-			return KeyEvent{Key: keyName(k.Key), Press: k.Down, Modifier: int(k.Mod)}, true
+			return KeyEvent{Key: keyName(k.Key), Press: k.Down, Modifier: mapModifiers(k.Mod), Repeat: k.Repeat}, true
 		}
 	}
 	return nil, false
 }
 
+// mapModifiers folds the SDL modifier mask into the portable
+// ModShift|ModCtrl|ModAlt|ModMeta bitfield so the UI layer never sees
+// a platform-specific mask.
+func mapModifiers(m sdl.Keymod) int {
+	var out int
+	if m&sdl.KMOD_SHIFT != 0 {
+		out |= ModShift
+	}
+	if m&sdl.KMOD_CTRL != 0 {
+		out |= ModCtrl
+	}
+	if m&sdl.KMOD_ALT != 0 {
+		out |= ModAlt
+	}
+	if m&sdl.KMOD_GUI != 0 {
+		out |= ModMeta
+	}
+	return out
+}
+
 // keyName maps a keycode to the portable name used by KeyEvent. The
-// common keys are named; anything else is reported as "#<keycode>" so
-// no key is ever dropped silently (Milestone 3 completes the table).
+// table is complete for the documented key set (docs/EVENTS.md §key
+// naming); anything outside it is reported as "#<keycode>" so no key
+// is ever dropped silently.
 func keyName(k sdl.Keycode) string {
 	switch k {
-	case sdl.K_RETURN:
+	case sdl.K_RETURN, sdl.K_KP_ENTER:
 		return "enter"
 	case sdl.K_ESCAPE:
 		return "escape"
@@ -200,6 +223,18 @@ func keyName(k sdl.Keycode) string {
 		return "tab"
 	case sdl.K_SPACE:
 		return "space"
+	case sdl.K_DELETE:
+		return "delete"
+	case sdl.K_INSERT:
+		return "insert"
+	case sdl.K_HOME:
+		return "home"
+	case sdl.K_END:
+		return "end"
+	case sdl.K_PAGEUP:
+		return "page-up"
+	case sdl.K_PAGEDOWN:
+		return "page-down"
 	case sdl.K_LEFT:
 		return "arrow-left"
 	case sdl.K_RIGHT:
@@ -208,6 +243,29 @@ func keyName(k sdl.Keycode) string {
 		return "arrow-up"
 	case sdl.K_DOWN:
 		return "arrow-down"
+	case sdl.K_CAPSLOCK:
+		return "caps-lock"
+	case sdl.K_NUMLOCKCLEAR:
+		return "num-lock"
+	case sdl.K_PRINTSCREEN:
+		return "print-screen"
+	case sdl.K_SCROLLLOCK:
+		return "scroll-lock"
+	case sdl.K_PAUSE:
+		return "pause"
+	case sdl.K_LSHIFT, sdl.K_RSHIFT:
+		return "shift"
+	case sdl.K_LCTRL, sdl.K_RCTRL:
+		return "control"
+	case sdl.K_LALT, sdl.K_RALT:
+		return "alt"
+	case sdl.K_LGUI, sdl.K_RGUI:
+		return "meta"
+	case sdl.K_APPLICATION:
+		return "menu"
+	}
+	if k >= sdl.K_F1 && k <= sdl.K_F12 {
+		return fmt.Sprintf("f%d", k-sdl.K_F1+1)
 	}
 	if k >= 0x20 && k < 0x7f {
 		return strings.ToLower(string(rune(k)))

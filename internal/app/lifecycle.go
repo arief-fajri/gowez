@@ -11,6 +11,7 @@ import (
 	"github.com/arief-fajri/gowez/internal/observe"
 	"github.com/arief-fajri/gowez/internal/render/backend/software"
 	"github.com/arief-fajri/gowez/internal/text"
+	"github.com/arief-fajri/gowez/internal/ui"
 	"github.com/arief-fajri/gowez/internal/window"
 )
 
@@ -96,6 +97,7 @@ func (a *App) execute(start time.Time) error {
 	if err != nil {
 		return a.fail("scene", "scene initialization failed", err)
 	}
+	a.wireScenePanic(scene)
 
 	if err := a.transition(StateReady); err != nil {
 		return err
@@ -108,6 +110,20 @@ func (a *App) execute(start time.Time) error {
 		return err
 	}
 	return a.transition(StateStopping)
+}
+
+// wireScenePanic connects the scene's handler-panic hook to the
+// reporter: a panicking UI handler is recovered by dispatch and
+// surfaced as a diagnostic while the frame loop keeps running
+// (docs/EVENTS.md §handler contract).
+func (a *App) wireScenePanic(scene *uiScene) {
+	scene.tree.OnPanic = func(e *ui.Event, recovered any) {
+		a.reporter.Report(observe.Diagnostic{
+			Component: "ui",
+			Message:   fmt.Sprintf("recovered panic in %s handler", e.Kind),
+			Err:       fmt.Errorf("%v", recovered),
+		})
+	}
 }
 
 // loop paces frames at frameBudget, pumps events, rasterizes, and
@@ -144,8 +160,16 @@ func (a *App) loop(win window.Window, rend *software.Renderer, scene *uiScene, f
 
 		running := true
 		for _, ev := range win.Pump() {
-			if _, ok := ev.(window.CloseEvent); ok {
+			switch ev.(type) {
+			case window.CloseEvent:
 				running = false
+			case window.PointerEvent, window.KeyEvent:
+				// Fed before drawing so a state change paints in the
+				// same frame (pump → dispatch → draw).
+				scene.handleInput(ev)
+			case window.ResizeEvent:
+				// No action: win.Size() is re-read below every frame
+				// and drives relayout directly.
 			}
 		}
 		if !running {

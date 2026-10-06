@@ -18,8 +18,11 @@ import (
 // belongs to the scene, not to the tree.
 var sceneBackground = render.Color{R: 0x14 / 255.0, G: 0x16 / 255.0, B: 0x1c / 255.0, A: 1}
 
-// demoCSS is the Milestone 2 acceptance stylesheet — only constructs from
-// docs/CSS-SUBSET.md (type/class selectors, box + flex properties).
+// demoCSS is the Milestone 3 acceptance stylesheet — constructs from
+// docs/CSS-SUBSET.md: type/class selectors, box + flex properties, and
+// the Milestone 3 pseudo-classes (:hover, :active, :focus). Pseudo
+// rules change colors only — never geometry — so a hover transition
+// cannot shift the boxes under the pointer (docs/EVENTS.md).
 const demoCSS = `
 panel { margin: 24px; background-color: #1e2028; padding: 16px;
 	border-width: 1px; border-color: #333945;
@@ -28,28 +31,38 @@ title { color: #ffffff; font-size: 22px; }
 row { display: flex; justify-content: space-between; align-items: center;
 	gap: 8px; height: 44px; }
 swatch-a { background-color: #2f6feb; width: 120px; height: 40px; }
+swatch-a:hover { background-color: #4c8dff; }
+swatch-a:focus { background-color: #7fb0ff; }
 swatch-b { background-color: #e0873a; width: 80px; height: 40px; }
+swatch-b:hover { background-color: #f0a05a; }
+swatch-b:focus { background-color: #ffc98a; }
 button { background-color: #2b303b; border-width: 2px; border-color: #4c8dff;
 	padding: 6px 12px; color: #ffffff; font-size: 14px; }
+button:hover { background-color: #394152; }
+button:active { background-color: #1f5bd6; }
+button:focus { border-color: #7fb0ff; }
 status { color: #e0873a; font-size: 13px; }
 `
 
-// uiScene is the Milestone 2 acceptance scene: a UI tree styled, laid
-// out, and painted through the runtime pipeline on every frame. It
-// replaces the Milestone 1 hand-drawn scene — cmd/gowez-hello is
-// unchanged, but its pixels now come from the UI runtime.
+// uiScene is the Milestone 3 acceptance scene: a UI tree styled, laid
+// out, and painted through the runtime pipeline, now driven by input —
+// clicking the button counts, keys echo into a status line, and
+// hover/press/focus restyle through the pseudo-class cascade.
 //
 // Relayout happens when the viewport size changes or when scene state
-// (the frame counter) changes; each pass is timed into the metrics
-// recorder (Module 5 §5.1).
+// changes (frame counter, clicks, keys, or interaction state); each
+// pass is timed into the metrics recorder (Module 5 §5.1).
 type uiScene struct {
-	tree    *ui.Tree
-	sheet   *style.Stylesheet
-	styles  map[ui.NodeID]style.ComputedStyle
-	geom    *layout.Result
-	counter *ui.Node
-	metrics *observe.Recorder
+	tree       *ui.Tree
+	sheet      *style.Stylesheet
+	styles     map[ui.NodeID]style.ComputedStyle
+	geom       *layout.Result
+	counter    *ui.Node
+	clicksNode *ui.Node
+	keyline    *ui.Node
+	metrics    *observe.Recorder
 
+	clicks       int
 	dirty        bool
 	lastW, lastH int
 	frames       int
@@ -82,19 +95,44 @@ func newUIScene(metrics *observe.Recorder) (*uiScene, error) {
 	text(mk(panel, "title"), "GoWEZ")
 	text(panel, "UI tree → style → layout → paint → commands. No Chromium, no WebView, no OS web view.")
 	row := mk(panel, "row")
-	mk(row, "swatch-a")
-	mk(row, "swatch-b")
+	swatchA := mk(row, "swatch-a")
+	swatchB := mk(row, "swatch-b")
 	button := mk(row, "button")
 	text(button, "Apply")
 	counter := text(panel, "frame 000000")
+	clicks := text(panel, "clicks: 0")
+	clicks.SetAttribute("style", "color: #e0873a")
+	keyline := text(panel, "key: —")
+	keyline.SetAttribute("style", "color: #7fb0ff")
 
-	return &uiScene{
-		tree:    tree,
-		sheet:   sheet,
-		counter: counter,
-		metrics: metrics,
-		dirty:   true,
-	}, nil
+	// Focusable elements for Tab traversal (docs/EVENTS.md §focus).
+	swatchA.SetAttribute("tabindex", "0")
+	swatchB.SetAttribute("tabindex", "0")
+	button.SetAttribute("tabindex", "0")
+
+	s := &uiScene{
+		tree:       tree,
+		sheet:      sheet,
+		counter:    counter,
+		clicksNode: clicks,
+		keyline:    keyline,
+		metrics:    metrics,
+		dirty:      true,
+	}
+
+	// Interaction: clicking the button counts; keys echo into the
+	// status line. Handlers run on the UI goroutine, mutate scene
+	// state, and mark the tree dirty (state → layout → paint).
+	s.tree.AddEventListener(button, ui.Click, func(*ui.Event) {
+		s.clicks++
+		s.clicksNode.Text = fmt.Sprintf("clicks: %d", s.clicks)
+		s.dirty = true
+	})
+	s.tree.AddEventListener(panel, ui.KeyDown, func(e *ui.Event) {
+		s.keyline.Text = "key: " + e.Key
+		s.dirty = true
+	})
+	return s, nil
 }
 
 // Tick advances the scene state; the counter text change marks the tree
@@ -118,6 +156,10 @@ func (s *uiScene) relayout(w, h int) error {
 		return fmt.Errorf("scene: layout: %w", err)
 	}
 	s.styles, s.geom = styles, geom
+	// Publish geometry to the tree so hit testing tracks this pass —
+	// assigned only after style and layout both succeeded (invariant
+	// I1: no half-applied update).
+	s.tree.SetGeometry(geom.Boxes)
 	s.lastW, s.lastH = w, h
 	s.dirty = false
 	if s.metrics != nil {

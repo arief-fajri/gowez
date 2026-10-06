@@ -4,6 +4,8 @@
 
 > **Status:** research / MVP technical validation. Not production-ready.
 > **Milestone 1 complete (2026-10-03):** native window → software renderer → text → resize, with the acceptance sample `cmd/gowez-hello`.
+> **Milestone 3 complete (2026-10-06):** mouse/keyboard input, event dispatch with bubbling, `:hover`/`:active`/`:focus` styling, Tab focus model, and state updates — event semantics contract in [docs/EVENTS.md](docs/EVENTS.md), golden `ui-state.png`.
+>
 > **Milestone 2 complete (2026-10-05):** UI tree → CSS subset → block/flex layout → hit testing → paint, with a live UI scene in `cmd/gowez-hello` and the [CSS subset spec](docs/CSS-SUBSET.md). See the [Roadmap](#roadmap) and the gated boxes in [`docs/CHECKLISTS.md`](docs/CHECKLISTS.md).
 
 ## The thesis
@@ -67,8 +69,8 @@ gowez/
 ├── cmd/gowez-hello/      # Milestone 1 acceptance sample (packaging CLIs: M7)
 ├── internal/             # runtime (not importable by applications)
 │   ├── app/              # lifecycle, startup sequence, config (M1 ✓)
-│   ├── window/           # native window + input (M1 ✓; input dispatch M3)
-│   ├── ui/               # UI tree, geometry, hit testing (M2 ✓; event dispatch M3)
+│   ├── window/           # native window + input (M1 ✓; input M3 ✓)
+│   ├── ui/               # UI tree, geometry, hit testing, events (M2–M3 ✓)
 │   ├── style/            # CSS subset (M2 ✓ — docs/CSS-SUBSET.md)
 │   ├── layout/           # box + flex layout (M2 ✓)
 │   ├── text/             # fonts, shaping, fallback (M1 ✓)
@@ -95,7 +97,7 @@ gowez/
 |---|---|---|
 | **M1** | Native window → software renderer → shapes/text → resize | ✅ done — 2026-10-03 ([checklist](docs/CHECKLISTS.md), [evidence](evidence/learnings.md)) |
 | **M2** | UI tree, style subset, layout, hit testing | ✅ done — 2026-10-05 ([checklist](docs/CHECKLISTS.md), [CSS subset](docs/CSS-SUBSET.md), [evidence](evidence/learnings.md)) |
-| **M3** | Button, mouse/keyboard events, state updates | planned |
+| **M3** | Button, mouse/keyboard events, state updates | ✅ done — 2026-10-06 ([EVENTS](docs/EVENTS.md), [checklist](docs/CHECKLISTS.md)) |
 | **M4** | Embedded JS engine, event binding, JS → Go API | planned |
 | **M5** | Svelte compile pipeline, counter example, state updates | planned |
 | **M6** | Native APIs: fs, dialog, clipboard, window control | planned |

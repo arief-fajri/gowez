@@ -13,6 +13,22 @@ const (
 	TextNode
 )
 
+// StateBits are the interaction states a node can carry (Milestone 3).
+// The runtime mutates them from pointer/keyboard input; the style
+// package matches pseudo-classes (docs/CSS-SUBSET.md) against them.
+type StateBits uint8
+
+const (
+	// StateHovered is set on the node under the pointer and its
+	// ancestors, cleared when the pointer leaves.
+	StateHovered StateBits = 1 << iota
+	// StatePressed is set on the press target and its ancestors until
+	// the button is released.
+	StatePressed
+	// StateFocused is set on the single node holding keyboard focus.
+	StateFocused
+)
+
 // Node is one element of the UI tree.
 type Node struct {
 	// ID is unique within the owning Tree.
@@ -30,6 +46,9 @@ type Node struct {
 	Parent *Node
 	// Children are child nodes in document order.
 	Children []*Node
+	// State holds hover/press/focus bits (Milestone 3). It is
+	// runtime-owned: input methods mutate it, style reads it.
+	State StateBits
 }
 
 // SetAttribute sets attribute name to value, replacing any previous value.

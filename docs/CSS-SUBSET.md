@@ -1,4 +1,4 @@
-# CSS Subset (Milestone 2)
+# CSS Subset (Milestones 2–3)
 
 The style layer supports **only** the constructs listed here. Anything else is a
 parse/resolve error with a position — never an ignored declaration and never a
@@ -16,18 +16,20 @@ Owner package: `internal/style`. Consumers: `internal/layout`, `internal/paint`.
 | Type | `button`, `text` | matches `Node.Tag` (`text` matches text nodes) |
 | Class | `.card` | matches any space-separated token in the `class` attribute |
 | ID | `#title` | matches the `id` attribute |
+| Pseudo-class | `button:hover`, `swatch:focus` | `:hover`, `:active`, `:focus` — matches `Node.State` set by input (see [EVENTS.md](EVENTS.md)) |
 | Descendant | `card title` / `card .row` | one or more space-separated compound selectors |
 | Group | `h1, h2` | comma-separated selectors sharing one block |
 | Inline style | `<node style="color: #fff">` | highest priority, no selector matching |
 
-A compound selector is `type?` followed by any `.class` / `#id` suffixes in any
-order (`button.primary.large`).
+A compound selector is `type?` followed by any `.class` / `#id` /
+`:pseudo` suffixes in any order (`button.primary:hover`).
 
 ### Rejected at parse time (explicit error)
 
 `*` (universal), `>` `+` `~` (other combinators), attribute selectors
-(`[href]`), pseudo-classes/elements (`:hover`, `::before`), `@`-rules
-(`@media`, `@import`), `!important`.
+(`[href]`), unsupported pseudo-classes (`:focus-visible`, `:nth-child`,
+…), pseudo-elements (`::before`), `@`-rules (`@media`, `@import`),
+`!important`.
 
 ## Properties
 
@@ -64,7 +66,9 @@ warnings.
 
 1. Declarations are collected in order: stylesheet rules by source order, then
    the inline `style` attribute last.
-2. Specificity tuple `(id, class, type)`; inline style beats every selector.
+2. Specificity tuple `(id, class, type)`; a pseudo-class counts in the
+   class column (`button:hover` = `(0,1,1)`); inline style beats every
+   selector.
 3. Higher specificity wins; equal specificity → later source order wins.
 4. `display: none` wins over everything for that node: the node produces no
    layout geometry and is not painted.
@@ -89,7 +93,8 @@ These are deliberate (G-UPG-04) and must stay in sync with the implementation:
 - **Always content-box.** `box-sizing` does not exist; `width` is the content
   box (the CSS initial value, minus the ability to change it).
 - **No `overflow`.** Content that does not fit is drawn outside its box; there
-  is no scroll container and no clipping in M2.
+  is no scroll container, no clipping, and no scroll events in M2/M3 (see
+  [EVENTS.md](EVENTS.md) §divergences).
 - **Text nodes are block-level boxes.** There is no inline flow: sibling text
   and elements stack vertically, and a word wider than its content box stays
   on one line (it is not broken).
@@ -100,6 +105,9 @@ These are deliberate (G-UPG-04) and must stay in sync with the implementation:
 - **Percentage height is rejected** (CSS would treat it as `auto` for
   auto-height parents; rejecting is explicit, treating it as auto silently is
   not).
+- **Only three pseudo-classes exist** (`:hover`, `:active`, `:focus`);
+  state bits come from input ([EVENTS.md](EVENTS.md)), there is no focus
+  ring (`outline` does not exist) and no cursor/`pointer` property.
 
 ## Error contract
 

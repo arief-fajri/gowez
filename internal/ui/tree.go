@@ -8,6 +8,20 @@ type Tree struct {
 	nextID NodeID
 	roots  []*Node
 	geom   map[NodeID]Geometry
+
+	// listeners is the event registry (Milestone 3): handlers by node
+	// in registration order, consumed by Dispatch.
+	listeners      map[NodeID][]listener
+	nextListenerID ListenerID
+
+	// Interaction state (Milestone 3): hover/press/focus bookkeeping
+	// mirrored into Node.State for pseudo-class matching.
+	hover, pressed, focus *Node
+	pressedButton         int
+
+	// OnPanic, when set, receives one report per recovered handler
+	// panic (docs/EVENTS.md §handler contract).
+	OnPanic func(e *Event, recovered any)
 }
 
 // NewTree creates an empty UI tree.
@@ -90,6 +104,9 @@ func (t *Tree) Detach(n *Node) error {
 	for i, c := range p.Children {
 		if c == n {
 			p.Children = append(p.Children[:i], p.Children[i+1:]...)
+			// Prune before clearing Parent: the state walk still needs
+			// the parent chain to reach ancestors above the cut.
+			t.pruneInteraction(n)
 			n.Parent = nil
 			return nil
 		}

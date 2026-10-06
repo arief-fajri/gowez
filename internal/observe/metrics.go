@@ -23,6 +23,16 @@ type Metrics struct {
 	IPCErrorCount uint64
 	// JSExceptions is the number of isolated JS errors.
 	JSExceptions uint64
+	// InputEvents is the number of input events fed to the UI tree.
+	InputEvents uint64
+	// DispatchedEvents is handler invocations across all input events.
+	DispatchedEvents uint64
+	// UnhandledEvents is input events that reached no listener
+	// (includes focus traversal and dropped key events).
+	UnhandledEvents uint64
+	// HandlerPanics is handler faults recovered by dispatch
+	// (docs/EVENTS.md §handler contract).
+	HandlerPanics uint64
 }
 
 // Recorder is a minimal in-process metrics sink. It is safe for concurrent
@@ -78,6 +88,23 @@ func (r *Recorder) RecordJSException() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.m.JSExceptions++
+}
+
+// RecordInput counts one input event fed to the UI tree: dispatched is
+// the number of handler runs it produced, panics the number of
+// recovered handler faults. An event with zero handler runs counts as
+// unhandled.
+func (r *Recorder) RecordInput(dispatched, panics int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.m.InputEvents++
+	r.m.DispatchedEvents += uint64(dispatched)
+	if dispatched == 0 {
+		r.m.UnhandledEvents++
+	}
+	if panics > 0 {
+		r.m.HandlerPanics += uint64(panics)
+	}
 }
 
 // Snapshot returns a consistent copy of the current metrics.

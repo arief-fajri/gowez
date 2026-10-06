@@ -107,7 +107,8 @@ func TestParseRejectsUnsupported(t *testing.T) {
 		{"universal selector", `* { color: #fff }`, "unsupported selector syntax"},
 		{"child combinator", `div > span { color: #fff }`, "unsupported selector syntax"},
 		{"sibling combinator", `h1 + p { color: #fff }`, "unsupported selector syntax"},
-		{"pseudo-class", `a:hover { color: #fff }`, "unsupported selector syntax"},
+		{"unsupported pseudo-class", `a:focus-visible { color: #fff }`, "unsupported pseudo-class"},
+		{"pseudo-element", `a::before { color: #fff }`, "unsupported pseudo-element"},
 		{"attribute selector", `a[href] { color: #fff }`, "unsupported selector syntax"},
 		{"at-rule", `@media screen { div { color: #fff } }`, "unsupported selector syntax"},
 		{"important", `div { color: #fff !important }`, "!important is not supported"},
@@ -401,5 +402,120 @@ func TestResolveEmpty(t *testing.T) {
 	}
 	if len(styles) != 0 {
 		t.Fatalf("styles = %d entries, want 0", len(styles))
+	}
+}
+
+// --- Milestone 3: pseudo-classes ---
+
+func TestParsePseudoClasses(t *testing.T) {
+	t.Parallel()
+	sheet, err := Parse(`
+button:hover { color: #111111 }
+:focus { color: #222222 }
+button:hover:active { color: #333333 }
+`)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(sheet.Rules) != 3 {
+		t.Fatalf("rules = %d, want 3", len(sheet.Rules))
+	}
+	if p := sheet.Rules[0].Selector.Steps[0].Pseudo; len(p) != 1 || p[0] != "hover" {
+		t.Fatalf("button:hover pseudo = %v, want [hover]", p)
+	}
+	if p := sheet.Rules[1].Selector.Steps[0].Pseudo; len(p) != 1 || p[0] != "focus" {
+		t.Fatalf(":focus pseudo = %v, want [focus]", p)
+	}
+	if p := sheet.Rules[2].Selector.Steps[0].Pseudo; len(p) != 2 || p[0] != "hover" || p[1] != "active" {
+		t.Fatalf("button:hover:active pseudo = %v, want [hover active]", p)
+	}
+	// Each pseudo-class counts like a class (CSS specificity).
+	if id, cls, typ := sheet.Rules[0].Selector.specificity(); id != 0 || cls != 1 || typ != 1 {
+		t.Fatalf("button:hover specificity = (%d,%d,%d), want (0,1,1)", id, cls, typ)
+	}
+	if id, cls, typ := sheet.Rules[2].Selector.specificity(); id != 0 || cls != 2 || typ != 1 {
+		t.Fatalf("button:hover:active specificity = (%d,%d,%d), want (0,2,1)", id, cls, typ)
+	}
+	if id, cls, typ := sheet.Rules[1].Selector.specificity(); id != 0 || cls != 1 || typ != 0 {
+		t.Fatalf(":focus specificity = (%d,%d,%d), want (0,1,0)", id, cls, typ)
+	}
+}
+
+// TestSelectorMatchesPseudoState proves pseudo-class matching reads the
+// node's interaction state; all pseudo-classes in a compound must hold.
+func TestSelectorMatchesPseudoState(t *testing.T) {
+	t.Parallel()
+	tree, title := buildStyleTree(t)
+	_ = tree
+	cases := []struct {
+		selector string
+		state    ui.StateBits
+		want     bool
+	}{
+		{"h1:hover", ui.StateHovered, true},
+		{"h1:hover", 0, false},
+		{"h1:active", ui.StatePressed, true},
+		{"h1:focus", ui.StateFocused, true},
+		{"h1:focus", ui.StateHovered, false},
+		{"h1:hover:active", ui.StateHovered | ui.StatePressed, true},
+		{"h1:hover:active", ui.StateHovered, false},
+		{"div:hover", ui.StateHovered, false}, // type mismatch
+	}
+	for _, c := range cases {
+		sheet, err := Parse(c.selector + " { color: #fff }")
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", c.selector, err)
+		}
+		title.State = c.state
+		if got := sheet.Rules[0].Selector.Matches(title); got != c.want {
+			t.Errorf("%q (state=%d) matches = %v, want %v", c.selector, c.state, got, c.want)
+		}
+	}
+	title.State = 0
+}
+
+// TestResolvePseudoCascade: the base rule applies when the state is
+// off; a matching pseudo-class rule wins by specificity, and among
+// equal-specificity pseudo rules source order decides (I6: the
+// cascade never changes silently).
+func TestResolvePseudoCascade(t *testing.T) {
+	t.Parallel()
+	tree, title := buildStyleTree(t)
+	sheet, err := Parse(`
+h1 { color: #111111 }
+h1:hover { color: #222222 }
+h1:focus { color: #333333 }
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolve := func() uint32 {
+		styles, err := Resolve(tree.Roots(), sheet)
+		if err != nil {
+			t.Fatalf("Resolve: %v", err)
+		}
+		return styles[title.ID].Color
+	}
+
+	if got := resolve(); got != 0x111111ff {
+		t.Fatalf("no state: color = #%08x, want base #111111ff", got)
+	}
+	title.State = ui.StateHovered
+	if got := resolve(); got != 0x222222ff {
+		t.Fatalf("hover: color = #%08x, want #222222ff", got)
+	}
+	title.State = ui.StateFocused
+	if got := resolve(); got != 0x333333ff {
+		t.Fatalf("focus: color = #%08x, want #333333ff", got)
+	}
+	// Equal specificity → later source order (:focus) wins.
+	title.State = ui.StateHovered | ui.StateFocused
+	if got := resolve(); got != 0x333333ff {
+		t.Fatalf("hover+focus: color = #%08x, want #333333ff (source order)", got)
+	}
+	// State off again → base rule.
+	title.State = 0
+	if got := resolve(); got != 0x111111ff {
+		t.Fatalf("state cleared: color = #%08x, want base #111111ff", got)
 	}
 }

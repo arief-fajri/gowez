@@ -6,7 +6,7 @@ import (
 	"github.com/arief-fajri/gowez/internal/ui"
 )
 
-// Compound is one type/.class/#id selector without combinators.
+// Compound is one type/.class/#id/:pseudo selector without combinators.
 type Compound struct {
 	// Type is the element name; "" when the compound is class/id only.
 	// The pseudo-type "text" matches text nodes.
@@ -15,15 +15,19 @@ type Compound struct {
 	Classes []string
 	// ID is the #id token; "" when absent.
 	ID string
+	// Pseudo holds the supported pseudo-class tokens (:hover, :active,
+	// :focus); all must match the node's interaction state.
+	Pseudo []string
 }
 
 // specificity returns the (id, class, type) tuple for this compound.
+// Each pseudo-class counts like a class, matching CSS (docs/CSS-SUBSET.md).
 func (c Compound) specificity() (int, int, int) {
 	id, cls, typ := 0, 0, 0
 	if c.ID != "" {
 		id++
 	}
-	cls += len(c.Classes)
+	cls += len(c.Classes) + len(c.Pseudo)
 	if c.Type != "" {
 		typ++
 	}
@@ -103,7 +107,28 @@ func matchCompound(c Compound, n *ui.Node) bool {
 			}
 		}
 	}
+	for _, p := range c.Pseudo {
+		if !matchPseudo(p, n) {
+			return false
+		}
+	}
 	return true
+}
+
+// matchPseudo checks one supported pseudo-class against the node's
+// interaction state. Unknown names never reach here — parseCompound
+// rejects them at parse time (a selector never silently ignores a
+// construct, docs/CSS-SUBSET.md).
+func matchPseudo(name string, n *ui.Node) bool {
+	switch name {
+	case "hover":
+		return n.State&ui.StateHovered != 0
+	case "active":
+		return n.State&ui.StatePressed != 0
+	case "focus":
+		return n.State&ui.StateFocused != 0
+	}
+	return false
 }
 
 // parseSelector parses one complex selector (descendant chain) from raw.
@@ -173,13 +198,35 @@ func parseCompound(src, s string, base int) (Compound, error) {
 				c.ID = name
 			}
 			i = j
+		case ':':
+			if i+1 < len(s) && s[i+1] == ':' {
+				return c, errAt(src, base+i,
+					"unsupported pseudo-element in %q: :: constructs are not supported (docs/CSS-SUBSET.md)", s)
+			}
+			j := i + 1
+			for j < len(s) && isNameChar(s[j]) {
+				j++
+			}
+			if j == i+1 || !isIdentStart(s[i+1]) {
+				return c, errAt(src, base+i, "invalid selector %q: expected a name after \":\"", s)
+			}
+			name := s[i+1 : j]
+			switch name {
+			case "hover", "active", "focus":
+				c.Pseudo = append(c.Pseudo, name)
+			default:
+				return c, errAt(src, base+i,
+					"unsupported pseudo-class %q in %q: only :hover, :active and :focus are supported (docs/CSS-SUBSET.md)",
+					name, s)
+			}
+			i = j
 		default:
 			return c, errAt(src, base+i,
-				"unsupported selector syntax %q in %q: only type, .class, #id and descendant combinators are supported (docs/CSS-SUBSET.md)",
+				"unsupported selector syntax %q in %q: only type, .class, #id, :pseudo-class and descendant combinators are supported (docs/CSS-SUBSET.md)",
 				string(s[i]), s)
 		}
 	}
-	if c.Type == "" && len(c.Classes) == 0 && c.ID == "" {
+	if c.Type == "" && len(c.Classes) == 0 && c.ID == "" && len(c.Pseudo) == 0 {
 		return c, errAt(src, base, "empty compound selector")
 	}
 	return c, nil

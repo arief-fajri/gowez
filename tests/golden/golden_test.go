@@ -146,11 +146,11 @@ func TestDeterminism(t *testing.T) {
 	}
 }
 
-// uiScene drives the full Milestone 2 pipeline — UI tree → style →
-// layout → paint — into the renderer. It exercises block stacking, word
-// wrapping, a flex row with space-between, and a static button (the
-// "Button renders" checklist box).
-func uiScene(t *testing.T, r render.Renderer) {
+// buildUIScene constructs the shared Milestone 2/3 acceptance scene:
+// card, wrapped text, flex row, and button. extraCSS extends the base
+// stylesheet; apply runs before style resolution so tests can set
+// interaction state (Milestone 3 pseudo-classes).
+func buildUIScene(t *testing.T, extraCSS string, apply func(tree *ui.Tree)) (*ui.Tree, map[ui.NodeID]style.ComputedStyle, *layout.Result) {
 	t.Helper()
 	tree := ui.NewTree()
 	mk := func(parent *ui.Node, tag string) *ui.Node {
@@ -193,7 +193,10 @@ swatch-blue { background-color: #2f6feb; width: 120px; height: 40px; }
 swatch-orange { background-color: #e0873a; width: 80px; height: 40px; }
 button { background-color: #2b303b; border-width: 2px; border-color: #4c8dff; padding: 6px 12px; color: #ffffff; font-size: 14px; }
 `
-	sheet, err := style.Parse(css)
+	if apply != nil {
+		apply(tree)
+	}
+	sheet, err := style.Parse(css + extraCSS)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -205,6 +208,63 @@ button { background-color: #2b303b; border-width: 2px; border-color: #4c8dff; pa
 	if err != nil {
 		t.Fatalf("Layout: %v", err)
 	}
+	return tree, styles, res
+}
+
+// uiScene drives the full Milestone 2 pipeline — UI tree → style →
+// layout → paint — into the renderer. It exercises block stacking, word
+// wrapping, a flex row with space-between, and a static button (the
+// "Button renders" checklist box).
+func uiScene(t *testing.T, r render.Renderer) {
+	t.Helper()
+	tree, styles, res := buildUIScene(t, "", nil)
+	if err := paint.Draw(r, tree.Roots(), res, styles, 1); err != nil {
+		t.Fatalf("Draw: %v", err)
+	}
+}
+
+// findTag returns the first element node with the given tag.
+func findTag(t *testing.T, tree *ui.Tree, tag string) *ui.Node {
+	t.Helper()
+	var found *ui.Node
+	var walk func(*ui.Node)
+	walk = func(n *ui.Node) {
+		if found != nil || n == nil {
+			return
+		}
+		if n.Kind == ui.ElementNode && n.Tag == tag {
+			found = n
+			return
+		}
+		for _, c := range n.Children {
+			walk(c)
+		}
+	}
+	for _, r := range tree.Roots() {
+		walk(r)
+	}
+	if found == nil {
+		t.Fatalf("no <%s> node in scene", tag)
+	}
+	return found
+}
+
+// uiStateScene drives the Milestone 3 pipeline with interaction state:
+// the button pressed (:active), the blue swatch hovered, and the
+// orange swatch focused — one golden pins every pseudo-class rule.
+func uiStateScene(t *testing.T, r render.Renderer) {
+	t.Helper()
+	const pseudo = `
+swatch-blue:hover { background-color: #4c8dff; }
+swatch-orange:focus { background-color: #ffc98a; }
+button:active { background-color: #1f5bd6; }
+button:focus { border-color: #7fb0ff; }
+`
+	tree, styles, res := buildUIScene(t, pseudo, func(tree *ui.Tree) {
+		findTag(t, tree, "swatch-blue").State = ui.StateHovered
+		findTag(t, tree, "swatch-orange").State = ui.StateFocused
+		findTag(t, tree, "button").State = ui.StatePressed
+	})
 	if err := paint.Draw(r, tree.Roots(), res, styles, 1); err != nil {
 		t.Fatalf("Draw: %v", err)
 	}
@@ -218,4 +278,14 @@ func TestUI(t *testing.T) {
 		uiScene(t, r)
 	})
 	checkGolden(t, "ui", got)
+}
+
+// TestUIState pins the Milestone 3 pseudo-class styling: hovered
+// swatch, focused swatch, and pressed button over the same scene.
+func TestUIState(t *testing.T) {
+	got := run(t, func(r render.Renderer) {
+		r.BeginFrame(640, 400)
+		uiStateScene(t, r)
+	})
+	checkGolden(t, "ui-state", got)
 }
