@@ -136,7 +136,7 @@ go vet ./...            # must be clean
 - `internal/observe` — metrics + diagnostics (Module 5)
 - `protocol/` — versioned JSON Schemas shared by Go and TypeScript
 - `packages/adapter` — Svelte → UI instructions (Strategy B, Milestone 5)
-- `examples/counter` — acceptance sample (Milestone 5)
+- `examples/dashboard` — acceptance sample, runnable in the browser (Milestone 5)
 - `tests/{golden,integration,failure,bench}` — cross-cutting suites
 - `evidence/{experiments,records,learnings.md}` — traceable artifacts
 

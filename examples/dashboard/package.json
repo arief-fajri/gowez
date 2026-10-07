@@ -1,0 +1,21 @@
+{
+  "name": "@gowez/example-dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runnable Svelte sample app (admin dashboard) — browser test bed for GoWEZ capabilities.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@gowez/adapter": "*",
+    "svelte": "^5.57.2"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.3"
+  }
+}

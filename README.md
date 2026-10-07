@@ -86,7 +86,7 @@ gowez/
 │   └── observe/          # metrics + diagnostics (M1 ✓ startup/frame metrics)
 ├── protocol/             # JSON Schemas: UI instructions + IPC contracts
 ├── packages/adapter/     # Svelte → UI instructions (TypeScript; M5)
-├── examples/counter/     # acceptance sample app (Milestone 5)
+├── examples/dashboard/   # acceptance sample app — runnable Svelte dashboard (Milestone 5)
 ├── tests/{golden,integration,failure,bench}/
 ├── evidence/{experiments,records,learnings.md}
 └── docs/                 # documentation (platform, guard rails, checklists)
@@ -100,7 +100,7 @@ gowez/
 | **M2** | UI tree, style subset, layout, hit testing | ✅ done — 2026-10-05 ([checklist](docs/CHECKLISTS.md), [CSS subset](docs/CSS-SUBSET.md), [evidence](evidence/learnings.md)) |
 | **M3** | Button, mouse/keyboard events, state updates | ✅ done — 2026-10-06 ([EVENTS](docs/EVENTS.md), [checklist](docs/CHECKLISTS.md)) |
 | **M4** | Embedded JS engine, event binding, JS → Go API | ✅ done — 2026-10-07 ([SCRIPT](docs/SCRIPT.md), [checklist](docs/CHECKLISTS.md), [DRR-004](evidence/records/2026-10-07_js-engine-goja.md)) |
-| **M5** | Svelte compile pipeline, counter example, state updates | planned |
+| **M5** | Svelte compile pipeline, dashboard sample, state updates | planned |
 | **M6** | Native APIs: fs, dialog, clipboard, window control | planned |
 | **M7** | Packaging, benchmarks vs Electron/Tauri, sample application | planned |
 

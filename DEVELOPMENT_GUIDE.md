@@ -51,6 +51,8 @@ go vet ./...            # must be clean
 ```bash
 npm install             # workspaces: packages/*, examples/*
 npm run typecheck -w @gowez/adapter
+npm run dev -w @gowez/example-dashboard     # sample dashboard in the browser (Vite)
+npm run build -w @gowez/example-dashboard   # production build of the sample
 ```
 
 The npm workspace exists for the Svelte toolchain (Strategy B). The Go side never imports it; the two meet only through `protocol/*.schema.json`.
@@ -67,7 +69,7 @@ Create and touch only what the current milestone needs. The full tree exists as 
 | **M2** UI tree | `internal/ui`, `internal/layout`, `internal/style`, `internal/paint` | ✅ done 2026-10-05 (subset spec: `docs/CSS-SUBSET.md`) |
 | **M3** Interaction | `internal/ui` (events, hit testing), `internal/window` (input) | ✅ done 2026-10-06 ([EVENTS](docs/EVENTS.md)) |
 | **M4** JavaScript | `internal/script`, `internal/ipc`, `protocol/ipc.schema.json` (+ registry/permission gate wired from `internal/api`, `internal/permission`) | ✅ done 2026-10-07 ([SCRIPT](docs/SCRIPT.md), [DRR-004](evidence/records/2026-10-07_js-engine-goja.md)) |
-| **M5** Svelte | `packages/adapter`, `internal/assets`, `examples/counter`, `protocol/ui-instruction.schema.json` | planned |
+| **M5** Svelte | `packages/adapter`, `internal/assets`, `examples/dashboard`, `protocol/ui-instruction.schema.json` | planned |
 | **M6** Native API | `internal/api`, `internal/permission` | planned |
 | **M7** Packaging + benchmark | `cmd/`, `tests/bench/`, docs split | planned |
 
