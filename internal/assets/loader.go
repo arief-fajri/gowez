@@ -19,7 +19,8 @@ func FromFS(fsys fs.FS) *Loader {
 // Load returns one asset by bundle-relative path.
 //
 // A missing asset is an explicit startup failure with a clear diagnostic
-// (Module 2 §2.4: "UI asset tidak ditemukan → startup gagal"), never a
+// (Module 2 §2.4: "UI asset missing → startup fails with a clear
+// diagnostic"), never a
 // silently empty UI.
 func (l *Loader) Load(name string) ([]byte, error) {
 	if l == nil || l.fsys == nil {

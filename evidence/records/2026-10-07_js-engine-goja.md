@@ -40,4 +40,4 @@ Dependency review (G-SEC-05): MIT license; pure Go; transitive deps limited to `
 
 ## Confirmation
 
-Human approver: **user (human operator) — 2026-10-07**. Confirmed via explicit engine choice in the M4 planning session ("goja (Recommended)") and execution approval ("mulai eksekusi") after this DRR was named as the blocking gate. Approved: option 1 (goja) with the `MemoryBytes` fail-explicit carve-out.
+Human approver: **user (human operator) — 2026-10-07**. Confirmed via explicit engine choice in the M4 planning session ("goja (Recommended)") and explicit approval to start execution after this DRR was named as the blocking gate. Approved: option 1 (goja) with the `MemoryBytes` fail-explicit carve-out.
