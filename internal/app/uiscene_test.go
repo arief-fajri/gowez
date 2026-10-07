@@ -13,10 +13,7 @@ import (
 // state (counter) changes — and not on unchanged frames.
 func TestUISceneRelayout(t *testing.T) {
 	rec := observe.NewRecorder()
-	scene, err := newUIScene(rec)
-	if err != nil {
-		t.Fatalf("newUIScene: %v", err)
-	}
+	scene := newTestScene(t, rec, nil)
 	r := software.New()
 	draw := func(w, h int) {
 		t.Helper()
@@ -76,10 +73,7 @@ func TestUISceneRelayout(t *testing.T) {
 // TestUIScenePresentsOpaqueBuffer: the demo scene must cover the whole
 // framebuffer (M1 present contract — no transparent pixels delivered).
 func TestUIScenePresentsOpaqueBuffer(t *testing.T) {
-	scene, err := newUIScene(nil)
-	if err != nil {
-		t.Fatalf("newUIScene: %v", err)
-	}
+	scene := newTestScene(t, nil, nil)
 	r := software.New()
 	r.BeginFrame(320, 200)
 	if err := scene.Draw(r, 320, 200, 320, 200); err != nil {

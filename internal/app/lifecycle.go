@@ -43,12 +43,12 @@ var (
 // Run executes the full startup sequence (Module 2 §2.3) and blocks
 // until shutdown:
 //
-//	config → window → renderer → scene → ready → render loop
+//	config → window → renderer → JS runtime → scene → ready → render loop
 //
 // Every step must either succeed or abort with an explicit diagnostic;
 // a partially initialized application never reaches ready state.
-// Remaining steps of the full MVP sequence (JS runtime, UI bundle)
-// arrive with their own milestones.
+// The remaining step of the full MVP sequence (UI bundle) arrives with
+// Milestone 5.
 func Run(opts Options) error {
 	start := time.Now()
 	a, err := New(opts)
@@ -93,9 +93,22 @@ func (a *App) execute(start time.Time) error {
 	defer win.Close()
 
 	rend := software.New()
-	scene, err := newUIScene(a.metrics)
+
+	// JS runtime + IPC channel (PLATFORM startup: renderer → JS runtime →
+	// scene). The engine is closed when execute returns (I12); a script
+	// that throws at load aborts startup explicitly, never silently.
+	disp, eng, err := newRuntime(a.metrics, a.reporter)
+	if err != nil {
+		return a.fail("script", "js runtime initialization failed", err)
+	}
+	defer eng.Close()
+
+	scene, err := newUIScene(a.metrics, eng, disp)
 	if err != nil {
 		return a.fail("scene", "scene initialization failed", err)
+	}
+	if err := scene.bindScript(); err != nil {
+		return a.fail("script", "scene script failed to load", err)
 	}
 	a.wireScenePanic(scene)
 

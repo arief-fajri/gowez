@@ -49,8 +49,10 @@ bubbling), `Key`, `X/Y`, `Button`, `Modifier`, plus `StopPropagation()`.
    listeners mid-dispatch.
 
 Registry API: `Tree.AddEventListener(node, kind, handler) → ListenerID`,
-`Tree.RemoveEventListener(node, id)`. The ID is the runtime-side handle
-the script layer (M4) maps the protocol's `handlerId` onto.
+`Tree.RemoveEventListener(node, id)`. The ID is the runtime-side handle;
+the M5 adapter maps the protocol's `handlerId` onto it. M4 wires the
+equivalent by hand — named JS handlers (`gowez.on`) bound to listeners
+([SCRIPT.md](SCRIPT.md)).
 
 ## Click synthesis
 
@@ -127,6 +129,12 @@ repeat arrives as repeated `KeyDown` with no matching extra `KeyUp`.
   process survive.
 - Handlers mutate application/scene state and mark the scene dirty;
   they never call layout or paint directly.
+- **M4:** a listener may forward the event to a JavaScript handler
+  (`script.Engine.FireHandler`). The JS side follows the same rule —
+  inline, never blocking, bounded by the handler budget
+  ([SCRIPT.md](SCRIPT.md)) — and a JS throw is isolated and observable
+  (G-REL-02), so dispatch continues. `ui.setText` is the script layer's
+  only tree-mutation door (inline, unknown ids rejected).
 
 ## Observability (P5)
 
@@ -149,5 +157,6 @@ repeat arrives as repeated `KeyDown` with no matching extra `KeyUp`.
 - Click requires identical press/release nodes; browsers fire on the
   nearest common ancestor instead.
 - No scroll events and no text input (`EVENT_TEXTINPUT`/IME): scroll
-  needs a scroll container (absent from the subset), text input is
-  Milestone 4 scope.
+  needs a scroll container (absent from the subset); text input/IME is
+  deferred to Milestone 5 (decision 2026-10-07 — M4 covered the JS
+  engine and IPC, not text entry).

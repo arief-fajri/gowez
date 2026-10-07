@@ -43,7 +43,7 @@
           "additionalProperties": false,
           "properties": {
             "code": {
-              "description": "-32601 method not found, -32602 invalid params, -32603 internal, -32000 permission denied, -32001 timeout.",
+              "description": "-32600 invalid request (schema version or envelope mismatch), -32601 method not found, -32602 invalid params, -32603 internal, -32000 permission denied, -32001 timeout.",
               "type": "integer"
             },
             "message": { "type": "string" }

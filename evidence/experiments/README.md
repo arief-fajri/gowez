@@ -9,7 +9,9 @@ An experiment without a record in this directory did not happen (AGENTS.md, evid
 | ID | Record | Status |
 |---|---|---|
 | A | [2026-10-03_a_renderer-init-failure.md](2026-10-03_a_renderer-init-failure.md) | ✅ executed 2026-10-03 (M1) — pass |
-| B–E | — | pending (M4/M6/M5+) — see [tests/failure/README.md](../../tests/failure/README.md) |
+| B | [2026-10-07_b_js-handler-exception.md](2026-10-07_b_js-handler-exception.md) | ✅ executed 2026-10-07 (M4) — pass |
+| C | [2026-10-07_c_unknown-method.md](2026-10-07_c_unknown-method.md) | ✅ executed 2026-10-07 (M4) — pass |
+| D–E | — | pending (M6/M5+) — see [tests/failure/README.md](../../tests/failure/README.md) |
 
 File naming: `YYYY-MM-DD_<experiment-id>_<slug>.md` — e.g. `2026-10-03_a_renderer-init-failure.md`.
 

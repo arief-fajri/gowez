@@ -54,9 +54,9 @@ The `render.Renderer` interface (`internal/render/renderer.go`) is the stable bo
 | Paint | `internal/paint` | tree + styles + geometry → render commands (M2 ✓) |
 | Text | `internal/text` | load, shape, fallback (M1 ✓) |
 | Render contract | `internal/render` | `Renderer`, `Command`, `Frame` (M1 ✓ contract + software backend) |
-| JS engine | `internal/script` | sandboxed engine + bounded limits (M4) |
-| IPC | `internal/ipc` | versioned request/response, bounded dispatch (M4) |
-| Permission | `internal/permission` | explicit grants, deny by default (M6) |
-| Native API | `internal/api` | `Registry` — the single door to the OS (M6) |
+| JS engine | `internal/script` | goja, bounded eval/handler budget, `gowez.invoke/call/on` host surface (M4 ✓, [contract](SCRIPT.md)) |
+| IPC | `internal/ipc` | versioned request/response, bounded dispatch, inline mode for UI-tree mutation (M4 ✓, [schema](../protocol/ipc.schema.json)) |
+| Permission | `internal/permission` | explicit grants, deny by default (gate wired M4 ✓; grant model M6) |
+| Native API | `internal/api` | `Registry` — the single door to the OS (registry + `app.getInfo` M4 ✓; full set M6) |
 | Assets | `internal/assets` | bundle loader (go:embed at packaging; M5) |
-| Observability | `internal/observe` | metrics + diagnostics (M1 ✓ startup/frame; M3 ✓ input metrics) |
+| Observability | `internal/observe` | metrics + diagnostics (M1 ✓ startup/frame; M3 ✓ input metrics; M4 ✓ JS/IPC metrics) |

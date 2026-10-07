@@ -1,13 +1,17 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/arief-fajri/gowez/internal/ipc"
 	"github.com/arief-fajri/gowez/internal/layout"
 	"github.com/arief-fajri/gowez/internal/observe"
 	"github.com/arief-fajri/gowez/internal/paint"
 	"github.com/arief-fajri/gowez/internal/render"
+	"github.com/arief-fajri/gowez/internal/script"
 	"github.com/arief-fajri/gowez/internal/style"
 	"github.com/arief-fajri/gowez/internal/ui"
 )
@@ -44,14 +48,45 @@ button:focus { border-color: #7fb0ff; }
 status { color: #e0873a; font-size: 13px; }
 `
 
-// uiScene is the Milestone 3 acceptance scene: a UI tree styled, laid
-// out, and painted through the runtime pipeline, now driven by input —
-// clicking the button counts, keys echo into a status line, and
-// hover/press/focus restyle through the pseudo-class cascade.
+// demoJS is the Milestone 4 acceptance script: the scene's interaction
+// logic runs in the embedded engine, reaches Go through gowez.invoke (the
+// IPC dispatcher), and writes results back into the UI tree. Host surface
+// and divergences: docs/SCRIPT.md.
+//
+//	__scene        node ids injected by bindScript (scene-ids.js)
+//	gowez.on       register a handler (bound to the tree by Go)
+//	gowez.invoke   synchronous IPC call; throws an Error with .code on failure
+//	gowez.call     Promise-returning form of invoke
+const demoJS = `
+var sceneState = { clicks: 0, info: null };
+
+gowez.on("counterClick", function () {
+	sceneState.clicks += 1;
+	gowez.invoke("ui.setText", { nodeId: __scene.clicks, text: "clicks: " + sceneState.clicks });
+});
+
+gowez.on("keyEcho", function (ev) {
+	gowez.invoke("ui.setText", { nodeId: __scene.keyline, text: "key: " + ev.key });
+});
+
+// Startup proof: JS reaches a Go API through the dispatcher and the answer
+// lands in the UI (checklist: "UI can invoke Go API", "Go can return
+// success").
+sceneState.info = gowez.invoke("app.getInfo");
+gowez.invoke("ui.setText", {
+	nodeId: __scene.status,
+	text: "js: ok - ipc: " + sceneState.info.name + "/" + sceneState.info.ipcVersion + "/" + sceneState.info.engine
+});
+`
+
+// uiScene is the Milestone 4 acceptance scene: a UI tree styled, laid
+// out, and painted through the runtime pipeline, with interaction logic
+// living in the embedded JavaScript engine — clicking the button and
+// echoing keys run JS handlers that call back into Go over IPC.
 //
 // Relayout happens when the viewport size changes or when scene state
-// changes (frame counter, clicks, keys, or interaction state); each
-// pass is timed into the metrics recorder (Module 5 §5.1).
+// changes (frame counter, JS-driven text, interaction state); each pass
+// is timed into the metrics recorder (Module 5 §5.1).
 type uiScene struct {
 	tree       *ui.Tree
 	sheet      *style.Stylesheet
@@ -60,17 +95,33 @@ type uiScene struct {
 	counter    *ui.Node
 	clicksNode *ui.Node
 	keyline    *ui.Node
-	metrics    *observe.Recorder
+	statusNode *ui.Node
+	buttonNode *ui.Node
+	panelNode  *ui.Node
+	// nodesByID is the address space ui.setText exposes to JavaScript —
+	// only nodes registered here are reachable (G-SEC-01: no tree-wide
+	// ambient access from the script layer).
+	nodesByID map[ui.NodeID]*ui.Node
+	metrics   *observe.Recorder
+	eng       script.Engine
 
-	clicks       int
 	dirty        bool
 	lastW, lastH int
 	frames       int
 }
 
-// newUIScene builds the demo tree and stylesheet. The first layout runs
-// on the first Draw, against the real viewport size.
-func newUIScene(metrics *observe.Recorder) (*uiScene, error) {
+// newUIScene builds the demo tree and stylesheet, and registers the
+// runtime-owned ui.setText method on the dispatcher. The first layout
+// runs on the first Draw, against the real viewport size. Script loading
+// happens separately in bindScript so a script failure reports as a
+// "script" startup fault, not a scene fault.
+func newUIScene(metrics *observe.Recorder, eng script.Engine, disp *ipc.Dispatcher) (*uiScene, error) {
+	if eng == nil {
+		return nil, fmt.Errorf("scene: nil script engine")
+	}
+	if disp == nil {
+		return nil, fmt.Errorf("scene: nil ipc dispatcher")
+	}
 	sheet, err := style.Parse(demoCSS)
 	if err != nil {
 		return nil, fmt.Errorf("scene: demo stylesheet: %w", err)
@@ -104,6 +155,8 @@ func newUIScene(metrics *observe.Recorder) (*uiScene, error) {
 	clicks.SetAttribute("style", "color: #e0873a")
 	keyline := text(panel, "key: —")
 	keyline.SetAttribute("style", "color: #7fb0ff")
+	status := text(panel, "js: —")
+	status.SetAttribute("style", "color: #6fcf97")
 
 	// Focusable elements for Tab traversal (docs/EVENTS.md §focus).
 	swatchA.SetAttribute("tabindex", "0")
@@ -116,23 +169,83 @@ func newUIScene(metrics *observe.Recorder) (*uiScene, error) {
 		counter:    counter,
 		clicksNode: clicks,
 		keyline:    keyline,
-		metrics:    metrics,
-		dirty:      true,
+		statusNode: status,
+		buttonNode: button,
+		panelNode:  panel,
+		nodesByID: map[ui.NodeID]*ui.Node{
+			clicks.ID:  clicks,
+			keyline.ID: keyline,
+			status.ID:  status,
+		},
+		metrics: metrics,
+		eng:     eng,
+		dirty:   true,
 	}
 
-	// Interaction: clicking the button counts; keys echo into the
-	// status line. Handlers run on the UI goroutine, mutate scene
-	// state, and mark the tree dirty (state → layout → paint).
-	s.tree.AddEventListener(button, ui.Click, func(*ui.Event) {
-		s.clicks++
-		s.clicksNode.Text = fmt.Sprintf("clicks: %d", s.clicks)
-		s.dirty = true
-	})
-	s.tree.AddEventListener(panel, ui.KeyDown, func(e *ui.Event) {
-		s.keyline.Text = "key: " + e.Key
-		s.dirty = true
-	})
+	// ui.setText is the script layer's only UI mutation door: inline (the
+	// tree is single-goroutine — it runs on the UI goroutine that called
+	// gowez.invoke), permission-free (it touches no OS capability), and
+	// addressable only for nodes the scene registered above.
+	if err := disp.RegisterInline("ui.setText", "", s.handleSetText); err != nil {
+		return nil, fmt.Errorf("scene: register ui.setText: %w", err)
+	}
 	return s, nil
+}
+
+// handleSetText is the ui.setText IPC handler: {nodeId, text} → node text
+// + dirty. Unknown ids fail with CodeInvalidParams — a failed update never
+// applies (I1).
+func (s *uiScene) handleSetText(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+	_ = ctx
+	var p struct {
+		NodeID int    `json:"nodeId"`
+		Text   string `json:"text"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, ipc.NewCodeError(ipc.CodeInvalidParams, fmt.Sprintf("ui.setText: bad params: %v", err))
+	}
+	n, ok := s.nodesByID[ui.NodeID(p.NodeID)]
+	if !ok {
+		return nil, ipc.NewCodeError(ipc.CodeInvalidParams, fmt.Sprintf("ui.setText: unknown node %d", p.NodeID))
+	}
+	n.Text = p.Text
+	s.dirty = true
+	return json.RawMessage(`true`), nil
+}
+
+// bindScript loads the scene script and binds its handlers to the tree.
+// Startup order: the node-id prelude first (demoJS reads __scene), then
+// demoJS itself, then a hard check that every handler the listeners need
+// actually exists — a missing handler is an explicit load failure, never a
+// silent dead button.
+func (s *uiScene) bindScript() error {
+	ids := fmt.Sprintf("var __scene = {clicks: %d, keyline: %d, status: %d};",
+		s.clicksNode.ID, s.keyline.ID, s.statusNode.ID)
+	if err := s.eng.Eval("scene-ids.js", ids); err != nil {
+		return fmt.Errorf("scene ids: %w", err)
+	}
+	if err := s.eng.Eval("scene.js", demoJS); err != nil {
+		return fmt.Errorf("scene.js: %w", err)
+	}
+	for _, name := range []string{"counterClick", "keyEcho"} {
+		if !s.eng.HasHandler(name) {
+			return fmt.Errorf("scene.js did not register handler %q", name)
+		}
+	}
+
+	// Thin Go-side listeners: dispatch (bubbling, focus, metrics) stays in
+	// internal/ui; the logic moves to JS. FireHandler failures are already
+	// observed by the engine (diagnostic + JSExceptions), so the listener
+	// itself has nothing left to report (docs/EVENTS.md §handler contract:
+	// inline on the UI goroutine, must not block).
+	s.tree.AddEventListener(s.buttonNode, ui.Click, func(*ui.Event) {
+		_ = s.eng.FireHandler("counterClick", json.RawMessage(`{"type":"click"}`))
+	})
+	s.tree.AddEventListener(s.panelNode, ui.KeyDown, func(e *ui.Event) {
+		payload, _ := json.Marshal(map[string]any{"type": "key-down", "key": e.Key})
+		_ = s.eng.FireHandler("keyEcho", payload)
+	})
+	return nil
 }
 
 // Tick advances the scene state; the counter text change marks the tree

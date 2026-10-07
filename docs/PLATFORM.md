@@ -48,6 +48,6 @@
 
 - **Startup** — config → window → renderer → JS runtime → UI bundle → UI tree → layout → render → ready; any failed step aborts explicitly.
 - **Interaction** — input → hit test → UI node → JS handler → state change → UI update → layout → render commands → GPU.
-- **Native operation** — UI → `app.invoke` → IPC dispatcher → permission gate → Go handler → OS → response.
+- **Native operation** — UI → `gowez.invoke` → IPC dispatcher → permission gate → Go handler → OS → response.
 
 **Success boundary:** validation ✓, native op ✓, persistence committed ✓, response returned ✓.

@@ -66,12 +66,12 @@ Create and touch only what the current milestone needs. The full tree exists as 
 | **M1** Window + renderer | `internal/app`, `internal/window`, `internal/text`, `internal/render` (+ `backend/software`), `internal/observe` | ✅ done 2026-10-03 (OpenGL backend follows as a separate step, after the software backend proves the contract) |
 | **M2** UI tree | `internal/ui`, `internal/layout`, `internal/style`, `internal/paint` | ✅ done 2026-10-05 (subset spec: `docs/CSS-SUBSET.md`) |
 | **M3** Interaction | `internal/ui` (events, hit testing), `internal/window` (input) | ✅ done 2026-10-06 ([EVENTS](docs/EVENTS.md)) |
-| **M4** JavaScript | `internal/script`, `internal/ipc`, `protocol/ipc.schema.json` | planned |
+| **M4** JavaScript | `internal/script`, `internal/ipc`, `protocol/ipc.schema.json` (+ registry/permission gate wired from `internal/api`, `internal/permission`) | ✅ done 2026-10-07 ([SCRIPT](docs/SCRIPT.md), [DRR-004](evidence/records/2026-10-07_js-engine-goja.md)) |
 | **M5** Svelte | `packages/adapter`, `internal/assets`, `examples/counter`, `protocol/ui-instruction.schema.json` | planned |
 | **M6** Native API | `internal/api`, `internal/permission` | planned |
 | **M7** Packaging + benchmark | `cmd/`, `tests/bench/`, docs split | planned |
 
-Goja (JS engine) is a Milestone 4 decision — M1–M3 contain no JavaScript.
+The JS engine is **goja** (pinned in `go.mod`; decision: [DRR-004](evidence/records/2026-10-07_js-engine-goja.md)). Host surface and limits: [docs/SCRIPT.md](docs/SCRIPT.md).
 
 ---
 
@@ -105,9 +105,9 @@ Goja (JS engine) is a Milestone 4 decision — M1–M3 contain no JavaScript.
 | Kind | Location | Rule |
 |---|---|---|
 | Unit | `_test.go` beside the package | test the contract, not the implementation |
-| Golden | `tests/golden/` | layout/render output must be byte-deterministic (M1 ✓ — `-update` regenerates) |
+| Golden | `tests/golden/` | layout/render output must be byte-deterministic (M1–M3 ✓ — `-update` regenerates) |
 | Integration | `tests/integration/` | one milestone end-to-end path; GUI checks live in `TestMain` (OS main thread) |
-| Failure | `tests/failure/` | experiments A–E; record every run in `evidence/experiments/` (A executed M1; B–E pending) |
+| Failure | `tests/failure/` | experiments A–E; record every run in `evidence/experiments/` (A executed M1; B–C executed M4; D–E pending) |
 | Bench | `tests/bench/` | fixed workload; compare against Electron/Tauri baselines (M7). M1 micro-benchmarks live in-package — see §1 |
 
 Determinism is an acceptance criterion (Module 6): identical input must produce identical layout geometry, shaped text, and command streams.

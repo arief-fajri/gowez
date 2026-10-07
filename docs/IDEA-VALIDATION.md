@@ -13,6 +13,8 @@ Developers who want web-style UI (HTML/Svelte authoring) for desktop apps today 
 
 **Interaction (M3, 2026-10-06):** input → hit test → event dispatch → handler → state update → re-layout works in the live scene (mouse, keyboard, `:hover`/`:active`/`:focus`, focus traversal), pinned by golden `tests/golden/testdata/ui-state.png`; operator visual verification confirmed 2026-10-06 ([EVENTS](EVENTS.md), [checklist](CHECKLISTS.md)).
 
+**JS runtime (M4, 2026-10-07):** the script half of the target is proven — an embedded engine (goja, [DRR-004](../evidence/records/2026-10-07_js-engine-goja.md)) runs bounded interaction logic that reaches Go through the permission-gated IPC dispatcher and writes results back into the UI tree (`TestSceneJSDrivesStateThroughIPC`; failure experiments [B](../evidence/experiments/2026-10-07_b_js-handler-exception.md)/[C](../evidence/experiments/2026-10-07_c_unknown-method.md)); host contract in [SCRIPT](SCRIPT.md).
+
 The Svelte → compile → UI-representation half remains a hypothesis until M5.
 
 Market/user evidence is **not** collected. Milestones must not assume market demand (Module 0 §2 honesty check).

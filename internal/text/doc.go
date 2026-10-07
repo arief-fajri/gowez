@@ -9,5 +9,5 @@
 // cover render as the font's notdef glyph (visible tofu) — there is no
 // silent substitution between fonts and no script is dropped without a
 // visible artifact. Complex-script shaping guarantees are validated
-// before being claimed (Milestone 4+).
+// before being claimed — not yet validated (hard rule 6, G-UPG-04).
 package text

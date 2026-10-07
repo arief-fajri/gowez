@@ -11,8 +11,8 @@ Guard rails hold only if they can be measured. A system property may not change 
 | Rendering | frame time, dropped frames, render errors | `internal/render`, `internal/observe` | M1 ✓ (`FrameCount`, `DroppedFrames`) |
 | Layout | pass count, last pass duration | `internal/app`, `internal/observe` | M2 ✓ (`LayoutCount`, `LastLayoutDuration`) |
 | Input | input events, dispatched handlers, unhandled events, recovered handler panics | `internal/app`, `internal/ui`, `internal/observe` | M3 ✓ (`InputEvents`, `DispatchedEvents`, `UnhandledEvents`, `HandlerPanics`) |
-| JS | execution errors/duration, uncaught exceptions | `internal/script`, `internal/observe` | M4 |
-| IPC | invocation count, error count, duration | `internal/ipc`, `internal/observe` | M4 |
+| JS | eval/handler duration, isolated exceptions | `internal/script`, `internal/observe` | M4 ✓ (`JSExceptions`, `LastJSEvalDuration`, `Diagnostic{Component:"script"}`) |
+| IPC | invocation count, error count, duration | `internal/ipc`, `internal/observe` | M4 ✓ (`IPCCount`, `IPCErrorCount`, `LastIPCDuration`) |
 | Resource | memory, CPU, GPU/resource failures | `internal/observe` | M5+ |
 
 Collection surface: `observe.Recorder` (`internal/observe`). Wiring each event happens with its milestone.
@@ -22,8 +22,8 @@ Collection surface: `observe.Recorder` (`internal/observe`). Wiring each event h
 | ID | Experiment | Proves | Status |
 |---|---|---|---|
 | A | renderer init failure | G-REL-03, no half-initialized app | ✅ executed 2026-10-03 — [record](../evidence/experiments/2026-10-03_a_renderer-init-failure.md) |
-| B | JS exception | G-REL-02, isolation | pending (M4) |
-| C | unknown IPC method | deterministic error, bounded call | pending (M4) |
+| B | JS exception | G-REL-02, isolation | ✅ executed 2026-10-07 — [record](../evidence/experiments/2026-10-07_b_js-handler-exception.md) |
+| C | unknown IPC method | deterministic error, bounded call | ✅ executed 2026-10-07 — [record](../evidence/experiments/2026-10-07_c_unknown-method.md) |
 | D | invalid native operation | error propagation, no partial state | pending (M6) |
 | E | resource pressure | bounded degradation | pending (M5+) |
 

@@ -4,9 +4,10 @@
 
 > **Status:** research / MVP technical validation. Not production-ready.
 > **Milestone 1 complete (2026-10-03):** native window → software renderer → text → resize, with the acceptance sample `cmd/gowez-hello`.
-> **Milestone 3 complete (2026-10-06):** mouse/keyboard input, event dispatch with bubbling, `:hover`/`:active`/`:focus` styling, Tab focus model, and state updates — event semantics contract in [docs/EVENTS.md](docs/EVENTS.md), golden `ui-state.png`.
 >
 > **Milestone 2 complete (2026-10-05):** UI tree → CSS subset → block/flex layout → hit testing → paint, with a live UI scene in `cmd/gowez-hello` and the [CSS subset spec](docs/CSS-SUBSET.md). See the [Roadmap](#roadmap) and the gated boxes in [`docs/CHECKLISTS.md`](docs/CHECKLISTS.md).
+> **Milestone 3 complete (2026-10-06):** mouse/keyboard input, event dispatch with bubbling, `:hover`/`:active`/`:focus` styling, Tab focus model, and state updates — event semantics contract in [docs/EVENTS.md](docs/EVENTS.md), golden `ui-state.png`.
+> **Milestone 4 complete (2026-10-07):** embedded JS engine (goja, [DRR-004](evidence/records/2026-10-07_js-engine-goja.md)) — bounded eval/handler budget, `gowez.invoke`/`call`/`on` host surface, permission-gated IPC dispatcher, JS-driven scene state — host contract in [docs/SCRIPT.md](docs/SCRIPT.md), failure experiments B and C executed.
 
 ## The thesis
 
@@ -77,10 +78,10 @@ gowez/
 │   ├── paint/            # tree + styles + layout → render commands (M2 ✓)
 │   ├── render/           # backend-agnostic command contract (M1 ✓)
 │   │   └── backend/{software,opengl}/   # software M1 ✓; opengl after M1
-│   ├── script/           # embedded JS engine (sandboxed; M4)
-│   ├── ipc/              # UI ↔ Go dispatch (versioned, bounded; M4)
-│   ├── permission/       # explicit grant model (M6)
-│   ├── api/              # built-in native APIs — the single door to the OS (M6)
+│   ├── script/           # embedded JS engine (sandboxed; M4 ✓ — docs/SCRIPT.md)
+│   ├── ipc/              # UI ↔ Go dispatch (versioned, bounded; M4 ✓)
+│   ├── permission/       # explicit grant model (gate wired M4 ✓ deny-by-default; grants M6)
+│   ├── api/              # built-in native APIs — the single door to the OS (registry + app.getInfo M4 ✓; full set M6)
 │   ├── assets/           # UI bundle loading (M5)
 │   └── observe/          # metrics + diagnostics (M1 ✓ startup/frame metrics)
 ├── protocol/             # JSON Schemas: UI instructions + IPC contracts
@@ -98,7 +99,7 @@ gowez/
 | **M1** | Native window → software renderer → shapes/text → resize | ✅ done — 2026-10-03 ([checklist](docs/CHECKLISTS.md), [evidence](evidence/learnings.md)) |
 | **M2** | UI tree, style subset, layout, hit testing | ✅ done — 2026-10-05 ([checklist](docs/CHECKLISTS.md), [CSS subset](docs/CSS-SUBSET.md), [evidence](evidence/learnings.md)) |
 | **M3** | Button, mouse/keyboard events, state updates | ✅ done — 2026-10-06 ([EVENTS](docs/EVENTS.md), [checklist](docs/CHECKLISTS.md)) |
-| **M4** | Embedded JS engine, event binding, JS → Go API | planned |
+| **M4** | Embedded JS engine, event binding, JS → Go API | ✅ done — 2026-10-07 ([SCRIPT](docs/SCRIPT.md), [checklist](docs/CHECKLISTS.md), [DRR-004](evidence/records/2026-10-07_js-engine-goja.md)) |
 | **M5** | Svelte compile pipeline, counter example, state updates | planned |
 | **M6** | Native APIs: fs, dialog, clipboard, window control | planned |
 | **M7** | Packaging, benchmarks vs Electron/Tauri, sample application | planned |
@@ -123,7 +124,7 @@ Quick start:
 
 ```bash
 go build ./...              # framework compiles (pure-Go deps, no cgo)
-go run ./cmd/gowez-hello    # opens a real window (Milestone 1 sample)
+go run ./cmd/gowez-hello    # opens a real window (acceptance sample, M1–M4)
 gofmt -l .                  # must print nothing
 go vet ./...
 ```

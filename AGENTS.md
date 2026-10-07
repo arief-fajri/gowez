@@ -77,7 +77,7 @@ Your autonomy is bounded:
 
 - **Idea validation:** [docs/IDEA-VALIDATION.md](docs/IDEA-VALIDATION.md) — problem, evidence status, risks, decision
 - **Architecture:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **Contracts:** [protocol/ui-instruction.schema.json](protocol/ui-instruction.schema.json), [protocol/ipc.schema.json](protocol/ipc.schema.json), [docs/CSS-SUBSET.md](docs/CSS-SUBSET.md), [docs/EVENTS.md](docs/EVENTS.md)
+- **Contracts:** [protocol/ui-instruction.schema.json](protocol/ui-instruction.schema.json), [protocol/ipc.schema.json](protocol/ipc.schema.json), [docs/CSS-SUBSET.md](docs/CSS-SUBSET.md), [docs/EVENTS.md](docs/EVENTS.md), [docs/SCRIPT.md](docs/SCRIPT.md)
 - **Commands & conventions:** [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) (single source of truth)
 - **Guard rails:** [docs/GUARDRAILS.md](docs/GUARDRAILS.md)
 - **Roadmap:** [README.md](README.md#roadmap)
@@ -88,7 +88,7 @@ Your autonomy is bounded:
 go build ./...          # framework compiles (pure-Go deps only, no cgo)
 ```
 
-Runnable acceptance sample: `go run ./cmd/gowez-hello` (Milestone 1 complete 2026-10-03; Milestone 2 UI scene 2026-10-05; Milestone 3 input/interaction 2026-10-06). Packaging-grade entrypoints arrive with Milestone 7. The public surface is the root `gowez` package only.
+Runnable acceptance sample: `go run ./cmd/gowez-hello` (Milestone 1 complete 2026-10-03; Milestone 2 UI scene 2026-10-05; Milestone 3 input/interaction 2026-10-06; Milestone 4 JS engine/IPC 2026-10-07). Packaging-grade entrypoints arrive with Milestone 7. The public surface is the root `gowez` package only.
 
 ## Test
 
@@ -128,10 +128,10 @@ go vet ./...            # must be clean
 - `internal/render` — backend-agnostic `Renderer` contract + commands
 - `internal/render/backend/software` — CPU reference backend (first, for CI/tests)
 - `internal/render/backend/opengl` — GPU backend (after software proves the contract)
-- `internal/script` — sandboxed JS engine (Milestone 4; goja deliberately not wired yet)
-- `internal/ipc` — versioned, bounded UI ↔ Go dispatch
-- `internal/permission` — explicit grant model (secure by default)
-- `internal/api` — built-in native APIs; `Registry` is the single door to the OS
+- `internal/script` — sandboxed JS engine (goja, M4 ✓ — contract in [`docs/SCRIPT.md`](docs/SCRIPT.md); DRR-004)
+- `internal/ipc` — versioned, bounded UI ↔ Go dispatch (M4 ✓ incl. inline UI-mutation mode)
+- `internal/permission` — explicit grant model (gate wired M4 ✓ deny-by-default; grants M6)
+- `internal/api` — built-in native APIs; `Registry` is the single door to the OS (registry + `app.getInfo` M4 ✓; full set M6)
 - `internal/assets` — UI bundle loading (go:embed at packaging)
 - `internal/observe` — metrics + diagnostics (Module 5)
 - `protocol/` — versioned JSON Schemas shared by Go and TypeScript

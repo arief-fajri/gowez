@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -36,6 +37,26 @@ func findTag(t *testing.T, tree *ui.Tree, tag string) *ui.Node {
 	return found
 }
 
+// newTestScene builds the scene the way the startup sequence does —
+// runtime (IPC dispatcher + JS engine) → scene → script binding — without
+// opening a window. Pass a reporter to observe script/IPC diagnostics.
+func newTestScene(t *testing.T, rec *observe.Recorder, rep observe.Reporter) *uiScene {
+	t.Helper()
+	disp, eng, err := newRuntime(rec, rep)
+	if err != nil {
+		t.Fatalf("newRuntime: %v", err)
+	}
+	t.Cleanup(func() { _ = eng.Close() })
+	scene, err := newUIScene(rec, eng, disp)
+	if err != nil {
+		t.Fatalf("newUIScene: %v", err)
+	}
+	if err := scene.bindScript(); err != nil {
+		t.Fatalf("bindScript: %v", err)
+	}
+	return scene
+}
+
 // warmUp draws one frame so the tree has geometry, and returns the
 // center of the button in logical (event) coordinates.
 func warmUp(t *testing.T, scene *uiScene, w, h int) (cx, cy float64) {
@@ -61,10 +82,7 @@ func warmUp(t *testing.T, scene *uiScene, w, h int) (cx, cy float64) {
 // results must reach the tree so hit testing works in the running app
 // (M2 shipped HitTest but only tests ever called SetGeometry).
 func TestUISceneGeometryPublishedToTree(t *testing.T) {
-	scene, err := newUIScene(nil)
-	if err != nil {
-		t.Fatalf("newUIScene: %v", err)
-	}
+	scene := newTestScene(t, nil, nil)
 	warmUp(t, scene, 800, 600)
 
 	// The panel covers the top-left area; hit testing must find it.
@@ -79,18 +97,14 @@ func TestUISceneGeometryPublishedToTree(t *testing.T) {
 // TestSceneClickUpdatesState: a click reaches the button listener,
 // mutates scene state, and marks the tree dirty (state → layout).
 func TestSceneClickUpdatesState(t *testing.T) {
-	scene, err := newUIScene(nil)
-	if err != nil {
-		t.Fatalf("newUIScene: %v", err)
-	}
+	scene := newTestScene(t, nil, nil)
 	cx, cy := warmUp(t, scene, 800, 600)
 
 	scene.handleInput(window.PointerEvent{X: cx, Y: cy, Press: true, Button: window.ButtonLeft})
 	scene.handleInput(window.PointerEvent{X: cx, Y: cy, Press: false, Button: window.ButtonLeft})
 
-	if scene.clicks != 1 {
-		t.Fatalf("clicks = %d, want 1", scene.clicks)
-	}
+	// The counter is owned by the JS handler (M4): a click dispatched by
+	// internal/ui ran scene.js, which called ui.setText over IPC.
 	if got := scene.clicksNode.Text; got != "clicks: 1" {
 		t.Fatalf("clicks text = %q, want %q", got, "clicks: 1")
 	}
@@ -105,18 +119,15 @@ func TestSceneClickUpdatesState(t *testing.T) {
 	// A drag-away release fires no second click.
 	scene.handleInput(window.PointerEvent{X: cx, Y: cy, Press: true, Button: window.ButtonLeft})
 	scene.handleInput(window.PointerEvent{X: cx + 500, Y: cy + 500, Press: false, Button: window.ButtonLeft})
-	if scene.clicks != 1 {
-		t.Fatalf("clicks after drag-away = %d, want 1", scene.clicks)
+	if got := scene.clicksNode.Text; got != "clicks: 1" {
+		t.Fatalf("clicks text after drag-away = %q, want %q", got, "clicks: 1")
 	}
 }
 
 // TestSceneKeyEchoUpdatesStatus: keys reach the focused node's
 // listener; without focus they change nothing.
 func TestSceneKeyEchoUpdatesStatus(t *testing.T) {
-	scene, err := newUIScene(nil)
-	if err != nil {
-		t.Fatalf("newUIScene: %v", err)
-	}
+	scene := newTestScene(t, nil, nil)
 	cx, cy := warmUp(t, scene, 800, 600)
 
 	// No focus yet: the key is dropped, status untouched.
@@ -141,10 +152,7 @@ func TestSceneKeyEchoUpdatesStatus(t *testing.T) {
 // fed events, handler runs, and unhandled events are all counted.
 func TestHandleInputRecordsMetrics(t *testing.T) {
 	rec := observe.NewRecorder()
-	scene, err := newUIScene(rec)
-	if err != nil {
-		t.Fatalf("newUIScene: %v", err)
-	}
+	scene := newTestScene(t, rec, nil)
 	warmUp(t, scene, 800, 600)
 
 	// Motion over the backdrop: no target, no listener → unhandled.
@@ -210,10 +218,7 @@ func TestLoopDispatchesInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	scene, err := newUIScene(a.metrics)
-	if err != nil {
-		t.Fatalf("newUIScene: %v", err)
-	}
+	scene := newTestScene(t, a.metrics, nil)
 	cx, cy := warmUp(t, scene, 800, 600)
 
 	win := &fakeWindow{
@@ -231,8 +236,8 @@ func TestLoopDispatchesInput(t *testing.T) {
 		t.Fatalf("loop: %v", err)
 	}
 
-	if scene.clicks != 1 {
-		t.Fatalf("clicks after loop = %d, want 1 (click synthesized in the loop)", scene.clicks)
+	if got := scene.clicksNode.Text; got != "clicks: 1" {
+		t.Fatalf("clicks text after loop = %q, want %q (click synthesized in the loop, handled by scene.js)", got, "clicks: 1")
 	}
 	if got := scene.keyline.Text; got != "key: arrow-left" {
 		t.Fatalf("keyline after loop = %q, want %q", got, "key: arrow-left")
@@ -261,10 +266,7 @@ func TestLoopRecoversHandlerPanic(t *testing.T) {
 	}
 	rec := &captureReporter{}
 	a.reporter = rec
-	scene, err := newUIScene(a.metrics)
-	if err != nil {
-		t.Fatalf("newUIScene: %v", err)
-	}
+	scene := newTestScene(t, a.metrics, nil)
 	a.wireScenePanic(scene)
 	btn := findTag(t, scene.tree, "button")
 	scene.tree.AddEventListener(btn, ui.Click, func(*ui.Event) { panic("handler boom") })
@@ -297,4 +299,94 @@ type captureReporter struct {
 
 func (c *captureReporter) Report(d observe.Diagnostic) {
 	c.diags = append(c.diags, d)
+}
+
+// TestSceneJSDrivesStateThroughIPC is the Milestone 4 end-to-end path:
+// input → dispatch → JS handler → gowez.invoke → IPC dispatcher →
+// ui.setText → dirty → next frame. It also pins the startup success path
+// (scene.js invoked app.getInfo and the result is on screen).
+// Checklist evidence: "UI can invoke Go API", "Go can return success",
+// "UI state can update".
+func TestSceneJSDrivesStateThroughIPC(t *testing.T) {
+	rec := observe.NewRecorder()
+	scene := newTestScene(t, rec, nil)
+	cx, cy := warmUp(t, scene, 800, 600)
+
+	// Startup: scene.js called app.getInfo through the dispatcher and wrote
+	// the answer into the status line.
+	if got := scene.statusNode.Text; !strings.Contains(got, "ipc: gowez/1/goja") {
+		t.Fatalf("status = %q, want the app.getInfo payload", got)
+	}
+
+	// Click → counterClick (JS) → ui.setText (IPC).
+	scene.handleInput(window.PointerEvent{X: cx, Y: cy, Press: true, Button: window.ButtonLeft})
+	scene.handleInput(window.PointerEvent{X: cx, Y: cy, Press: false, Button: window.ButtonLeft})
+	if got := scene.clicksNode.Text; got != "clicks: 1" {
+		t.Fatalf("clicks = %q, want %q", got, "clicks: 1")
+	}
+	if !scene.dirty {
+		t.Fatal("dirty = false after a JS-driven update")
+	}
+
+	// Key → keyEcho (JS) → ui.setText (IPC).
+	scene.handleInput(window.KeyEvent{Key: "enter", Press: true})
+	if got := scene.keyline.Text; got != "key: enter" {
+		t.Fatalf("keyline = %q, want %q", got, "key: enter")
+	}
+
+	m := rec.Snapshot()
+	if m.IPCCount < 4 { // getInfo + status + clicks + keyline
+		t.Fatalf("IPCCount = %d, want >= 4", m.IPCCount)
+	}
+	if m.IPCErrorCount != 0 {
+		t.Fatalf("IPCErrorCount = %d, want 0", m.IPCErrorCount)
+	}
+	if m.JSExceptions != 0 {
+		t.Fatalf("JSExceptions = %d, want 0", m.JSExceptions)
+	}
+	if m.LastIPCDuration <= 0 {
+		t.Fatalf("LastIPCDuration = %v, want > 0 (P5)", m.LastIPCDuration)
+	}
+	if m.LastJSEvalDuration <= 0 {
+		t.Fatalf("LastJSEvalDuration = %v, want > 0 (P5)", m.LastJSEvalDuration)
+	}
+}
+
+// TestSceneJSHandlerFailureIsObservable: a throwing JS handler is isolated
+// and observable — JSExceptions counts it, a Component "script" diagnostic
+// is reported, and the scene keeps drawing (guard rail G-REL-02, failure
+// experiment B's unit-level shape).
+func TestSceneJSHandlerFailureIsObservable(t *testing.T) {
+	rec := observe.NewRecorder()
+	rep := &captureReporter{}
+	scene := newTestScene(t, rec, rep)
+
+	if err := scene.eng.Eval("bad.js", `gowez.on("boom", function () { throw new Error("handler boom"); });`); err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if err := scene.eng.FireHandler("boom", nil); err == nil {
+		t.Fatal("throwing handler must surface an error")
+	}
+
+	m := rec.Snapshot()
+	if m.JSExceptions == 0 {
+		t.Fatalf("JSExceptions = 0, want >= 1 (P5)")
+	}
+	found := false
+	for _, d := range rep.diags {
+		if d.Component == "script" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("diagnostics = %+v, want a script component", rep.diags)
+	}
+
+	// The runtime survives: the scene still draws a frame.
+	r := software.New()
+	r.BeginFrame(800, 600)
+	if err := scene.Draw(r, 800, 600, 800, 600); err != nil {
+		t.Fatalf("scene unusable after JS exception: %v", err)
+	}
+	r.EndFrame()
 }

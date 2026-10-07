@@ -9,7 +9,9 @@ A checklist item passes only with a test, an experiment record, or a documented 
 
 **M3 gate:** the boxes checked below were closed on **2026-10-06** — automated evidence ([input_test.go](../internal/app/input_test.go), [interaction_test.go](../internal/ui/interaction_test.go), [sdl_test.go](../internal/window/sdl_test.go), [golden ui-state.png](../tests/golden/testdata/ui-state.png)) plus a smoke run of `cmd/gowez-hello`. Event semantics: [docs/EVENTS.md](EVENTS.md).
 
-## Core correctness (M1–M3)
+**M4 gate:** the boxes checked below were closed on **2026-10-07** — automated evidence ([script tests](../internal/script/engine_test.go), [ipc tests](../internal/ipc/dispatcher_test.go), [app tests](../internal/app/input_test.go) incl. `TestSceneJSDrivesStateThroughIPC`, experiments [B](../evidence/experiments/2026-10-07_b_js-handler-exception.md)/[C](../evidence/experiments/2026-10-07_c_unknown-method.md)) plus a smoke run of `cmd/gowez-hello` (alive, SIGTERM → rc 0). Engine decision: [DRR-004](../evidence/records/2026-10-07_js-engine-goja.md). Host contract: [docs/SCRIPT.md](SCRIPT.md).
+
+## Core correctness (M1–M4)
 
 - [x] Application starts from a clean environment — [startup sequence test](../tests/integration/window_test.go), [experiment A](../evidence/experiments/2026-10-03_a_renderer-init-failure.md)
 - [x] Native window opens — [tests/integration/window_test.go](../tests/integration/window_test.go)
@@ -20,7 +22,7 @@ A checklist item passes only with a test, an experiment record, or a documented 
 - [x] Mouse click reaches UI — [input_test.go](../internal/app/input_test.go) (`TestLoopDispatchesInput`, `TestSceneClickUpdatesState`), [interaction_test.go](../internal/ui/interaction_test.go)
 - [x] Keyboard input works — [input_test.go](../internal/app/input_test.go) (`TestSceneKeyEchoUpdatesStatus`), [interaction_test.go](../internal/ui/interaction_test.go) (`TestTabTraversalWraps`, `TestEnterSpaceActivatesFocusedButton`)
 - [x] UI state can update — [input_test.go](../internal/app/input_test.go) (`TestSceneClickUpdatesState`: click → text change → dirty → relayout), [golden ui-state.png](../tests/golden/testdata/ui-state.png)
-- [ ] JS exception is observable
+- [x] JS exception is observable — [experiment B](../evidence/experiments/2026-10-07_b_js-handler-exception.md), [TestSceneJSHandlerFailureIsObservable](../internal/app/input_test.go), [TestFireHandlerExceptionIsolatedAndCounted](../internal/script/engine_test.go) (`JSExceptions` metric + `Component "script"` diagnostic)
 - [x] Application exits cleanly — window close path + SIGINT/SIGTERM → rc 0, [lifecycle.go](../internal/app/lifecycle.go), [integration test](../tests/integration/window_test.go)
 
 ## Svelte integration (M5)
@@ -36,12 +38,12 @@ A checklist item passes only with a test, an experiment record, or a documented 
 
 ## IPC (M4/M6)
 
-- [ ] UI can invoke Go API
-- [ ] Go can return success
-- [ ] Go can return error
-- [ ] Unknown method fails deterministically
-- [ ] IPC cannot invoke arbitrary native function
-- [ ] IPC lifecycle is bounded
+- [x] UI can invoke Go API — [TestSceneJSDrivesStateThroughIPC](../internal/app/input_test.go) (scene click → JS → `gowez.invoke` → dispatcher)
+- [x] Go can return success — same test: `app.getInfo` payload rendered into the status line; [TestDispatchSuccess](../internal/ipc/dispatcher_test.go)
+- [x] Go can return error — [experiment C](../evidence/experiments/2026-10-07_c_unknown-method.md), [TestDispatchUsesHandlerCodeError](../internal/ipc/dispatcher_test.go), [TestInvokePermissionDeniedThrowsWithCode](../internal/script/bindings_test.go)
+- [x] Unknown method fails deterministically — [experiment C](../evidence/experiments/2026-10-07_c_unknown-method.md) (`-32601`, both Go and JS paths, watchdog-bounded), [TestDispatchUnknownMethodIsDeterministic](../internal/ipc/dispatcher_test.go)
+- [x] IPC cannot invoke arbitrary native function — JS surface is `gowez.invoke/call/on` only ([TestSandboxSurface](../internal/script/engine_test.go)); methods must be explicitly registered behind permissions ([TestDispatchPermissionGate](../internal/ipc/dispatcher_test.go), [registry tests](../internal/api/registry_test.go))
+- [x] IPC lifecycle is bounded — [TestDispatchTimeoutIsBounded](../internal/ipc/dispatcher_test.go), [TestInvokeIsBoundedByHandlerBudget](../internal/script/bindings_test.go), watchdogs in experiments B/C
 
 ## Rendering (M1/M2)
 
@@ -54,11 +56,11 @@ A checklist item passes only with a test, an experiment record, or a documented 
 
 ## Security (M4/M6)
 
-- [ ] JavaScript cannot access arbitrary Go functions
+- [x] JavaScript cannot access arbitrary Go functions — [TestSandboxSurface](../internal/script/engine_test.go) (globals limited to the documented host surface), [TestOnRejectsInvalidRegistrations](../internal/script/bindings_test.go) (handlers register by explicit name only), [G-SEC-01](GUARDRAILS.md)
 - [ ] Native APIs are explicit
 - [ ] Sensitive APIs can be permission controlled
 - [ ] Production debug interfaces are disabled
-- [ ] Dependencies are reviewed
+- [x] Dependencies are reviewed — goja pinned in [go.mod](../go.mod) with provenance and limits recorded in [DRR-004](../evidence/records/2026-10-07_js-engine-goja.md) (periodic audit stays with G-SEC-05)
 
 ## Release (M7)
 
@@ -82,7 +84,7 @@ The MVP counts as complete for **technical validation** when:
 - [ ] Basic UI renders through the GPU
 - [x] The user can interact with the UI — click/keyboard/state via [input_test.go](../internal/app/input_test.go) + [EVENTS.md](EVENTS.md) semantics; interactive scene in [uiscene.go](../internal/app/uiscene.go)
 - [ ] Svelte state produces UI updates
-- [ ] JS can call explicit Go APIs
+- [x] JS can call explicit Go APIs — [experiment C](../evidence/experiments/2026-10-07_c_unknown-method.md) (JS path asserts `e.code`), [TestInvokeSuccessReturnsResult](../internal/script/bindings_test.go), [TestSceneJSDrivesStateThroughIPC](../internal/app/input_test.go)
 - [ ] Go APIs can access at least one native capability
 - [ ] Main failure modes can be tested
 - [ ] Startup/memory/rendering benchmarks exist

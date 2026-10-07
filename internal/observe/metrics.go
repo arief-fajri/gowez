@@ -21,8 +21,12 @@ type Metrics struct {
 	IPCCount uint64
 	// IPCErrorCount is the number of failed IPC calls.
 	IPCErrorCount uint64
+	// LastIPCDuration is the duration of the most recent IPC call.
+	LastIPCDuration time.Duration
 	// JSExceptions is the number of isolated JS errors.
 	JSExceptions uint64
+	// LastJSEvalDuration is the duration of the most recent JS evaluation.
+	LastJSEvalDuration time.Duration
 	// InputEvents is the number of input events fed to the UI tree.
 	InputEvents uint64
 	// DispatchedEvents is handler invocations across all input events.
@@ -73,21 +77,31 @@ func (r *Recorder) RecordFrame(dropped bool) {
 	}
 }
 
-// RecordIPC counts one IPC call and its outcome.
-func (r *Recorder) RecordIPC(failed bool) {
+// RecordIPC counts one IPC call, stores its duration, and flags failures
+// (Module 5 §5.1: IPC invocation count, error count, duration).
+func (r *Recorder) RecordIPC(d time.Duration, failed bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.m.IPCCount++
+	r.m.LastIPCDuration = d
 	if failed {
 		r.m.IPCErrorCount++
 	}
 }
 
-// RecordJSException counts one isolated JS error.
+// RecordJSException counts one isolated JS error (Module 5 §5.1: JS
+// execution errors, uncaught exceptions).
 func (r *Recorder) RecordJSException() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.m.JSExceptions++
+}
+
+// RecordJSEval stores the duration of the most recent JS evaluation.
+func (r *Recorder) RecordJSEval(d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.m.LastJSEvalDuration = d
 }
 
 // RecordInput counts one input event fed to the UI tree: dispatched is
