@@ -77,8 +77,13 @@ What is **not** checked here, and is not an M5 criterion: whether the layout *lo
 Rebuild the bundle first if you edited the slice:
 
 ```bash
-npm install && npm run build:adapter && npm run build:sample
+npm install && npm run build:sample
 ```
+
+`build:sample` and `report:dashboard` both rebuild the adapter CLI first, because it
+is a build artifact (`packages/adapter/dist/`) and is not committed. Neither script
+works on a fresh clone without that step — which is why the dependency is in the
+script rather than in the reader's memory.
 
 ### Format & lint
 

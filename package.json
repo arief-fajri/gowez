@@ -11,7 +11,7 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build:adapter": "npm run build -w @gowez/adapter && npm run bundle:cli -w @gowez/adapter",
-    "build:sample": "npm run build -w @gowez/example-gowez-dashboard",
-    "report:dashboard": "node packages/adapter/dist/cli.cjs report --root examples/dashboard --entry src/App.svelte"
+    "build:sample": "npm run build:adapter && npm run build -w @gowez/example-gowez-dashboard",
+    "report:dashboard": "npm run build:adapter && node packages/adapter/dist/cli.cjs report --root examples/dashboard --entry src/App.svelte"
   }
 }
