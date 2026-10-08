@@ -232,10 +232,22 @@ export const rejectedFixtures: Array<{ name: string; code: string; source: strin
     source: `<section><p>x</p></section>
 <style>section { border-radius: 4px; }</style>`,
   },
+  // Note: a *well-formed but unresolvable* reference — `var(--nope)`, or
+  // `var(fg)` with a name that is not a custom property — is NOT reported here.
+  // It is a resolve-time error in Go, because a value containing var() cannot be
+  // validated before substitution, and substitution needs the cascade. The
+  // adapter mirror cannot do that, and guessing would mean rejecting stylesheets
+  // that are valid.
   {
-    name: 'css var()',
+    name: 'unterminated var()',
     code: 'CSS-PROPERTY',
     source: `<section><p>x</p></section>
-<style>section { color: var(--fg); }</style>`,
+<style>section { color: var(--fg; }</style>`,
+  },
+  {
+    name: 'color-mix in a colour space the subset does not implement',
+    code: 'CSS-PROPERTY',
+    source: `<section><p>x</p></section>
+<style>section { color: color-mix(in oklch, #000, #fff); }</style>`,
   },
 ] as const;

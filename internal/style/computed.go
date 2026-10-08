@@ -83,8 +83,13 @@ type ComputedStyle struct {
 	Width, Height Length
 	// Margin, Padding, BorderWidth are px lengths per side.
 	Margin, Padding, BorderWidth [4]float64
-	// BorderColor is the border fill as 0xRRGGBBAA.
-	BorderColor uint32
+	// BorderColor is the border fill per side as 0xRRGGBBAA, in the same
+	// order as BorderWidth.
+	//
+	// Per side, not one colour, because `border-bottom: 1px solid red` is a
+	// divider and a single value cannot express it: the common case for a
+	// border is "one edge, one colour, the rest absent".
+	BorderColor [4]uint32
 	// BackgroundColor is the box fill as 0xRRGGBBAA.
 	BackgroundColor uint32
 	// Color is the text color as 0xRRGGBBAA.
@@ -99,6 +104,15 @@ type ComputedStyle struct {
 	Gap            float64
 	// FlexGrow and FlexShrink apply to flex items on the main axis.
 	FlexGrow, FlexShrink float64
+	// Custom holds the element's resolved `--*` properties, after var()
+	// substitution.
+	//
+	// Resolved rather than raw so a descendant can inherit a flat value: under
+	// inheritance CSS re-evaluates a custom property in the child's context, so
+	// `--a: var(--b)` where `--b` is overridden below must re-resolve. Carrying
+	// the substituted text is what makes that work without re-walking the
+	// parent's declarations.
+	Custom map[string]string
 }
 
 // Initial returns the documented initial values (docs/CSS-SUBSET.md). Every
@@ -111,7 +125,7 @@ func Initial() ComputedStyle {
 		Height:          Length{Kind: LengthAuto},
 		Color:           0x000000ff,
 		BackgroundColor: 0x00000000,
-		BorderColor:     0x00000000,
+		BorderColor:     [4]uint32{0x00000000, 0x00000000, 0x00000000, 0x00000000},
 		FontSize:        16,
 		FlexDirection:   Row,
 		JustifyContent:  JustifyStart,

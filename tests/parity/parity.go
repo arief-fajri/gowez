@@ -91,6 +91,28 @@ func Cases() []Case {
 		{"border-width", "1px", true, ""},
 		{"border-color", "#333945", true, ""},
 
+		// Per-side border colour. `border-bottom: 1px solid red` is a divider,
+		// so one colour for the whole box cannot express the common case; these
+		// cases pin both the single-value shorthand and the longhands it expands
+		// into, including the rejection of a fifth colour.
+		{"border-color", "#111 #222 #333 #444", true, ""},
+		{"border-color", "#111 #222", true, ""},
+		{"border-color", "#111 #222 #333 #444 #555", false, "1-4 colors"},
+		{"border-top-color", "#abc", true, ""},
+		{"border-right-color", "#abc", true, ""},
+		{"border-bottom-color", "rgb(1 2 3 / 50%)", true, ""},
+		{"border-left-color", "notacolor", false, "unknown color"},
+
+		// `none`-only properties. The subset paints no list marker and no
+		// outline, so `none` is true rather than ignored — and every other value
+		// must be refused rather than swallowed, or the stylesheet would claim
+		// an effect the runtime does not produce.
+		{"list-style", "none", true, ""},
+		{"list-style", "disc", false, "only none"},
+		{"outline", "none", true, ""},
+		{"outline", "2px solid red", false, "only none"},
+		{"outline", "0", false, "only none"},
+
 		// typography
 		{"font-size", "14px", true, ""},
 		{"font-size", "0", true, ""},
@@ -100,6 +122,34 @@ func Cases() []Case {
 		{"text-align", "center", true, ""},
 		{"font-family", "sans-serif", true, ""},
 		{"opacity", "0.5", true, ""},
+
+		// custom properties and var(). The mirror cannot substitute, so parity
+		// is asserted on *acceptance* of the deferral plus the structural checks
+		// it does share: unbalanced parentheses are caught by both.
+		{"--gap", "8px", true, ""},
+		{"--gap", "var(--other)", true, ""},
+		{"--gap", "", true, "empty custom property is legal (set but empty)"},
+		{"color", "var(--fg)", true, ""},
+		{"padding", "var(--gap) 12px", true, ""},
+		{"color", "var(--a, var(--b, #00ff00))", true, ""},
+		{"color", "var(--fg", false, "unterminated var("},
+		// The deferral must not make an *unknown* property acceptable: the
+		// property is rejected before its value is ever looked at. Without
+		// these the mirror silently accepted `background: var(--x)`.
+		{"background", "var(--accent)", false, "unsupported property"},
+		{"grid-template-columns", "var(--cols)", false, "documented gap"},
+		{"border-radius", "var(--r)", false, "documented gap"},
+		{"--gap", "var(--fg", false, "unbalanced"},
+
+		// color-mix: only `in srgb`, exactly two colours.
+		{"color", "color-mix(in srgb, #000000, #ffffff)", true, ""},
+		{"color", "color-mix(in srgb, #dc2626 45%, transparent)", true, ""},
+		{"color", "color-mix(in srgb, #000 25%, #fff 75%)", true, ""},
+		{"color", "color-mix(in oklch, #000, #fff)", false, "only in srgb"},
+		{"color", "color-mix(in srgb, #000, #fff, #0f0)", false, "exactly two colours"},
+		{"color", "color-mix(in srgb, #000 30%, #fff 30%)", false, "sum to 100"},
+		{"color", "color-mix(in srgb, #000 150%, #fff)", false, "0-100%"},
+		{"border-color", "color-mix(in srgb, #dc2626 45%, transparent)", true, ""},
 
 		// documented gaps
 		{"border-radius", "4px", false, "documented gap"},

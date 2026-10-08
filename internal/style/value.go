@@ -21,8 +21,10 @@ const (
 	kindHeight       // auto | px
 	kindPx           // 0 | <n>px
 	kindBoxShorthand // 1–4 px lengths, expanded to longhands
+	kindColorSides   // 1–4 colors, expanded to per-side longhands
 	kindNumber       // unitless, ≥ 0
 	kindFontSize     // px, > 0
+	kindNoneOnly     // exactly the keyword `none`
 )
 
 type propSpec struct {
@@ -53,8 +55,14 @@ var properties = map[string]propSpec{
 	"border-right-width":  {kind: kindPx},
 	"border-bottom-width": {kind: kindPx},
 	"border-left-width":   {kind: kindPx},
-	"border-color":        {kind: kindColor},
+	"border-color":        {kind: kindColorSides, longhands: []string{"border-top-color", "border-right-color", "border-bottom-color", "border-left-color"}},
+	"border-top-color":    {kind: kindColor},
+	"border-right-color":  {kind: kindColor},
+	"border-bottom-color": {kind: kindColor},
+	"border-left-color":   {kind: kindColor},
 	"background-color":    {kind: kindColor},
+	"list-style":          {kind: kindNoneOnly},
+	"outline":             {kind: kindNoneOnly},
 	"color":               {kind: kindColor},
 	"font-size":           {kind: kindFontSize},
 	"flex-direction":      {kind: kindFlexDirection},
@@ -71,6 +79,21 @@ var properties = map[string]propSpec{
 func parseProperty(name string, spec propSpec, value string) ([]Declaration, error) {
 	if strings.Contains(value, "!") {
 		return nil, fmt.Errorf("%q: !important is not supported", value)
+	}
+	// A custom property is not in the typed table by design: its value is an
+	// untyped token stream that only the consuming property interprets.
+	if isCustomProperty(name) {
+		return parseCustomProperty(name, value)
+	}
+	// A value containing var() cannot be validated here — the substitution has
+	// not happened yet, and it happens per node at resolve time, after the
+	// cascade. Resolve re-parses the substituted text with the same typed parser,
+	// so deferring does not weaken the check, only relocates it.
+	if strings.Contains(value, "var(") {
+		if err := balancedParens(value); err != nil {
+			return nil, err
+		}
+		return []Declaration{{Property: name, Value: value}}, nil
 	}
 	if spec.kind == kindBoxShorthand {
 		parts := strings.Fields(value)
@@ -99,6 +122,39 @@ func parseProperty(name string, spec propSpec, value string) ([]Declaration, err
 		out := make([]Declaration, 0, 4)
 		for i, lh := range spec.longhands {
 			out = append(out, Declaration{Property: lh, Value: formatPx(full[i])})
+		}
+		return out, nil
+	}
+	if spec.kind == kindColorSides {
+		// Split on top-level whitespace: a value may itself be a function with
+		// spaces in it — `color-mix(in srgb, #f00, #fff)` is one colour, not five.
+		parts := splitTopLevelFields(value)
+		if len(parts) == 0 || len(parts) > 4 {
+			return nil, fmt.Errorf("want 1-4 colors, got %q", value)
+		}
+		// Each token is validated as a colour, then redistributed to the sides
+		// as its *original text*: a longhand must carry the author's spelling,
+		// and a position-carrying error message has to name what was written.
+		for _, p := range parts {
+			if _, err := parseColorValue(p); err != nil {
+				return nil, err
+			}
+		}
+		var full [4]string
+		for i := range full {
+			full[i] = parts[0]
+		}
+		switch len(parts) {
+		case 2:
+			full = [4]string{parts[0], parts[1], parts[0], parts[1]}
+		case 3:
+			full = [4]string{parts[0], parts[1], parts[2], parts[1]}
+		case 4:
+			full = [4]string{parts[0], parts[1], parts[2], parts[3]}
+		}
+		out := make([]Declaration, 0, 4)
+		for i, lh := range spec.longhands {
+			out = append(out, Declaration{Property: lh, Value: full[i]})
 		}
 		return out, nil
 	}
@@ -137,8 +193,25 @@ func parseTyped(kind valueKind, value string) (any, error) {
 		return parseNumberValue(value)
 	case kindFontSize:
 		return parseFontSizeValue(value)
+	case kindNoneOnly:
+		return parseNoneValue(value)
 	}
 	return nil, fmt.Errorf("internal: no parser for value kind %d", kind)
+}
+
+// parseNoneValue accepts only `none`.
+//
+// It exists for `list-style` and `outline`, whose only value the subset honours
+// is `none` — not because nothing is drawn, but because nothing is drawn
+// *already*: there is no list marker and no outline in the render pipeline. So
+// `none` is true rather than ignored, and every other value is refused rather
+// than silently swallowed. Accepting `outline: 2px solid red` would claim an
+// effect the runtime does not produce (G-UPG-04).
+func parseNoneValue(s string) (any, error) {
+	if s == "none" {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("only none is supported (the subset paints no list marker and no outline), got %q", s)
 }
 
 // parsePxValue accepts "0" or "<n>px"; negative lengths are rejected.
@@ -218,6 +291,9 @@ func parseFontSizeValue(s string) (float64, error) {
 // parseColorValue accepts #RGB, #RRGGBB, #RRGGBBAA, and the keywords
 // black, white, transparent. The result is 0xRRGGBBAA.
 func parseColorValue(s string) (uint32, error) {
+	if strings.HasPrefix(s, "color-mix(") {
+		return parseColorMixValue(s)
+	}
 	if strings.HasPrefix(s, "#") {
 		h := s[1:]
 		switch len(h) {

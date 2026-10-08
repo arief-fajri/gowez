@@ -102,14 +102,20 @@ gowez/
 | **M3** | Button, mouse/keyboard events, state updates | ✅ done — 2026-10-06 ([EVENTS](docs/EVENTS.md), [checklist](docs/CHECKLISTS.md)) |
 | **M4** | Embedded JS engine, event binding, JS → Go API | ✅ done — 2026-10-07 ([SCRIPT](docs/SCRIPT.md), [checklist](docs/CHECKLISTS.md), [DRR-004](evidence/records/2026-10-07_js-engine-goja.md)) |
 | **M5** | Svelte compile pipeline, instruction applier, UI bundle, reactivity, text input | ✅ done 2026-10-07 ([SVELTE.md](docs/SVELTE.md), [CHECKLISTS](docs/CHECKLISTS.md)) |
-| **M6** | Native APIs: fs, dialog, clipboard, window control | planned |
-| **M7** | Packaging, benchmarks vs Electron/Tauri, sample application | planned |
+| **M6** | Paint & value: shorthands, `border-radius`, `font-weight`, `list-style`, custom properties, `var()`, `color-mix()` | confirmed 2026-10-08 ([DRR-008](evidence/records/2026-10-08_dashboard-target.md)) |
+| **M7** | Layout engine: inline flow, `line-height`, `min`/`max`, `box-sizing`, `overflow` | planned |
+| **M8** | CSS Grid + `@media` (own DRR — a second layout algorithm) | planned |
+| **M9** | Host capabilities: bounded timers, routing, document head (own DRR — reverses a [SCRIPT.md](docs/SCRIPT.md) exclusion) | planned |
+| **M10** | Widgets & animation: `<table>`, `<select>`, transitions | planned |
+| **M11** | Text capabilities: OpenType features (`font-variant-numeric`, `tabular-nums`) — needs a font that ships `tnum`; the embedded Go faces have no GSUB table | planned |
+| later | Native APIs (fs, dialog, clipboard), then packaging + benchmarks | planned |
 
-> **The M6/M7 sequence above is under review.** A visual triage of the M5 slice against
-> `examples/dashboard` found that the CSS subset is sized to the slice rather than to a real
-> application (139 adapter findings), and proposes making that dashboard the target with
-> rendering work ahead of native APIs — [DRR-008](evidence/records/2026-10-08_dashboard-target.md),
-> **open, not yet approved**. The rows above are unchanged until it is signed.
+**The acceptance target is now `examples/dashboard`** — the full six-page admin app.
+Each milestone's gate is a measured drop in that app's gap register
+(`npm run report:dashboard`, **197 findings** after M6a; 259 before it, see
+[DRR-008](evidence/records/2026-10-08_dashboard-target.md)), so a gate can fail
+identifiably instead of "the milestone did not finish". The M5 slice remains the
+committed fast regression fixture.
 
 MVP success = the 12 criteria in [`docs/CHECKLISTS.md`](docs/CHECKLISTS.md). Reaching them proves the architectural hypothesis — **not** production readiness.
 

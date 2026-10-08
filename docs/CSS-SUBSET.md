@@ -59,7 +59,11 @@ Colors: `#RGB`, `#RRGGBB`, `#RRGGBBAA`, plus the keywords `black`, `white`,
 | `padding` | shorthand: 1–4 lengths (`px` only) | `0` | layout |
 | `padding-top/right/bottom/left` | `px` | `0` | layout |
 | `border-width` | shorthand: 1–4 lengths (`px` only) | `0` | layout + paint |
-| `border-color` | color | `transparent` | paint |
+| `border-<side>-width` | `px` | `0` | layout + paint |
+| `border-color` | shorthand: 1–4 colors, expanded per side | `transparent` | paint |
+| `border-<side>-color` | color | `transparent` | paint |
+| `list-style` | `none` only | `none` | — (nothing paints a marker) |
+| `outline` | `none` only | `none` | — (nothing paints an outline) |
 | `background-color` | color | `transparent` | paint |
 | `color` | color | `#000000` | paint (text) |
 | `font-size` | `px` (positive) | `16` | layout (measurement) + paint |
@@ -69,6 +73,42 @@ Colors: `#RGB`, `#RRGGBB`, `#RRGGBBAA`, plus the keywords `black`, `white`,
 | `gap` | `px` | `0` | layout |
 | `flex-grow` | number ≥ 0 | `0` | layout |
 | `flex-shrink` | number ≥ 0 | `1` | layout |
+
+### Custom properties and var()
+
+A declaration whose name starts with `--` stores its value as an **untyped token
+stream**; only the property that consumes it interprets the text. Substitution
+happens **after the cascade and before validation**, so:
+
+```css
+.app  { --brand: #f00 }
+.card { border-color: var(--brand) }
+```
+
+resolves to `border-color: #f00` per element.
+
+| Behaviour | Rule |
+|---|---|
+| Inheritance | a custom property inherits its **computed** value, i.e. after substitution (CSS Variables 1 §2.2) |
+| `var(--x, fallback)` | the fallback is used when `--x` is unset **or empty** |
+| Cycles | `--a: var(--b); --b: var(--a)` is an **error with position**, never an empty value |
+| Order | declaration order within a rule is irrelevant; all matching declarations are collected, then resolved |
+| Validation | the substituted text goes through the same typed parser as at parse time — deferring relocates the check, it does not weaken it |
+
+Two things are deliberately **not** checked, and both are honest limits rather
+than gaps:
+
+- The adapter's build-time mirror **cannot** substitute, so it accepts any
+  well-formed `var()` value and only checks that parentheses balance. Whether a
+  reference actually resolves is a *resolve-time* answer — `style: node N: color:
+  var(--nope) is not defined`. The two implementations agree on every verdict they
+  can both reach (pinned by `tests/parity`), and this is the one place where the
+  mirror's reach is narrower.
+- `color-mix()` supports `in srgb` only. `in oklch` and friends are **refused by
+  name**: interpolating them in srgb anyway would return a colour different from
+  every browser. Interpolation is **premultiplied**, so
+  `color-mix(in srgb, #f00 50%, transparent)` is `rgba(255,0,0,0.5)` and not
+  `rgba(128,0,0,0.5)`.
 
 Unknown properties, unknown values, `%` in `height`/`margin`/`padding`/
 `border-width`, and malformed declarations are **errors with position**, not
@@ -120,17 +160,22 @@ These are deliberate (G-UPG-04) and must stay in sync with the implementation:
 - **Only three pseudo-classes exist** (`:hover`, `:active`, `:focus`);
   state bits come from input ([EVENTS.md](EVENTS.md)), there is no focus
   ring (`outline` does not exist) and no cursor/`pointer` property.
+- **No OpenType features.** The embedded Go faces (Regular/Medium/Bold) carry no
+  GSUB table at all, so `font-variant-numeric: tabular-nums` cannot be honoured:
+  accepting it would draw digits at their default width while the stylesheet
+  claimed otherwise — a silent misrender (G-UPG-04). It stays a reported finding;
+  M11 owns the class, and M11 needs a font that actually ships `tnum`.
 - **No structural pseudo-classes.** `:last-child`, `:nth-child()` and friends
   need a document-order pass the matcher does not have; they are rejected rather
   than approximated. The adapter reports each one by name (`CSS-SELECTOR`), so a
   dropped rule reads as "not supported yet", not "adapter bug".
 - **The subset is sized to a slice, not to an application.** A visual triage of
-  the M5 slice against `examples/dashboard` measured **139 adapter findings**
+  the M5 slice against `examples/dashboard` measured **197 adapter findings**
   across 7 modules — no grid, no `border-radius`, no shorthands, no custom
   properties, no `line-height`, no `overflow`. What an application may not use
   today is enumerated in [SVELTE.md §Gap register](SVELTE.md#gap-register), and
   the proposal to close it is [DRR-008](../evidence/records/2026-10-08_dashboard-target.md)
-  (**open, not yet approved**).
+  (**confirmed 2026-10-08**).
 
 ## Error contract
 

@@ -62,6 +62,13 @@ func resolveNode(n *ui.Node, parent *ComputedStyle, rules []ruleRef, out map[ui.
 	if parent != nil {
 		st.Color = parent.Color
 		st.FontSize = parent.FontSize
+		// Custom properties inherit, so start from the parent's resolved set.
+		if len(parent.Custom) > 0 {
+			st.Custom = make(map[string]string, len(parent.Custom))
+			for k, v := range parent.Custom {
+				st.Custom[k] = v
+			}
+		}
 	}
 
 	var matches []cascadeMatch
@@ -79,9 +86,21 @@ func resolveNode(n *ui.Node, parent *ComputedStyle, rules []ruleRef, out map[ui.
 		}
 		return matches[a].order < matches[b].order
 	})
+
+	// Custom properties first, in cascade order, each substituted against the
+	// set built so far. Every other declaration then substitutes against the
+	// complete set. Doing it in this order is what makes a custom property able
+	// to reference one declared beside it.
+	if err := resolveCustomProperties(&st, matches, n); err != nil {
+		return err
+	}
+
 	for _, m := range matches {
 		for _, d := range m.decls {
-			if err := apply(&st, d); err != nil {
+			if isCustomProperty(d.Property) {
+				continue
+			}
+			if err := applyResolved(&st, d); err != nil {
 				return fmt.Errorf("style: node %d: %s: %w", n.ID, d.Property, err)
 			}
 		}
@@ -94,8 +113,16 @@ func resolveNode(n *ui.Node, parent *ComputedStyle, rules []ruleRef, out map[ui.
 		if err != nil {
 			return fmt.Errorf("style: node %d: inline style: %w", n.ID, err)
 		}
+		// Inline custom properties join the set before any inline var() is
+		// substituted, so `style="--ink: red; color: var(--ink)"` works.
+		if err := mergeCustomProperties(&st, decls, n, "inline"); err != nil {
+			return err
+		}
 		for _, d := range decls {
-			if err := apply(&st, d); err != nil {
+			if isCustomProperty(d.Property) {
+				continue
+			}
+			if err := applyResolved(&st, d); err != nil {
 				return fmt.Errorf("style: node %d: inline %s: %w", n.ID, d.Property, err)
 			}
 		}
@@ -108,6 +135,210 @@ func resolveNode(n *ui.Node, parent *ComputedStyle, rules []ruleRef, out map[ui.
 		}
 	}
 	return nil
+}
+
+// applyResolved substitutes var() in d and applies it.
+//
+// Substitution happens here rather than at parse time because a custom property
+// may be overridden on the element that uses it, so the only point at which the
+// value is knowable is after the cascade. The substituted text goes through the
+// same typed parser as at parse time, so deferring validation relocates it
+// rather than weakening it.
+func applyResolved(st *ComputedStyle, d Declaration) error {
+	if strings.Contains(d.Value, "var(") {
+		v, err := substituteVars(d.Value, st.Custom, nil)
+		if err != nil {
+			return err
+		}
+		d.Value = v
+		// A shorthand that contained var() was recorded un-expanded at parse
+		// time (its value was not yet a known token list), so expansion happens
+		// here, after substitution. Longhands that were already expanded at
+		// parse time fall through unchanged.
+		if spec, ok := properties[d.Property]; ok && len(spec.longhands) > 0 {
+			expanded, err := parseProperty(d.Property, spec, d.Value)
+			if err != nil {
+				return err
+			}
+			for _, lh := range expanded {
+				if err := apply(st, lh); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}
+	return apply(st, d)
+}
+
+// resolveCustomProperties builds the element's custom property set.
+//
+// Declaration order does not matter: every custom property a matching rule sets
+// is collected first, and only then substituted. Resolving them as they are
+// encountered would make `--a: var(--b)` fail with "not defined" whenever `--b`
+// happens to be declared later in the same rule — order-dependence that CSS does
+// not have, and that would report a cycle as a missing name.
+func resolveCustomProperties(st *ComputedStyle, matches []cascadeMatch, n *ui.Node) error {
+	raw := make(map[string]string, 4)
+	for _, m := range matches {
+		for _, d := range m.decls {
+			if isCustomProperty(d.Property) {
+				raw[d.Property] = d.Value
+			}
+		}
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	// Resolution sees the inherited set *and* this element's declarations, so a
+	// descendant may define `--ink: var(--fg)` in terms of a `--fg` it inherits.
+	lookup := make(map[string]string, len(st.Custom)+len(raw))
+	for k, v := range st.Custom {
+		lookup[k] = v
+	}
+	for k, v := range raw {
+		lookup[k] = v
+	}
+	resolved := make(map[string]string, len(lookup))
+	for name := range lookup {
+		v, err := resolveCustomProp(name, lookup, resolved, nil)
+		if err != nil {
+			return fmt.Errorf("style: node %d: %s: %w", n.ID, name, err)
+		}
+		resolved[name] = v
+	}
+	if st.Custom == nil {
+		st.Custom = make(map[string]string, len(resolved))
+	}
+	for name, v := range resolved {
+		st.Custom[name] = v
+	}
+	return nil
+}
+
+// mergeCustomProperties folds decls' custom properties into st.Custom, resolving
+// them against the set as it stands. Used for the inline declaration block,
+// which beats every selector and therefore has to be merged last.
+func mergeCustomProperties(st *ComputedStyle, decls []Declaration, n *ui.Node, where string) error {
+	raw := make(map[string]string, 4)
+	for _, d := range decls {
+		if isCustomProperty(d.Property) {
+			raw[d.Property] = d.Value
+		}
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	if st.Custom == nil {
+		st.Custom = make(map[string]string, len(raw))
+	}
+	resolved := make(map[string]string, len(raw))
+	for name := range raw {
+		v, err := resolveCustomProp(name, raw, resolved, nil)
+		if err != nil {
+			return fmt.Errorf("style: node %d: %s %s: %w", n.ID, where, name, err)
+		}
+		resolved[name] = v
+	}
+	for name, v := range resolved {
+		st.Custom[name] = v
+	}
+	return nil
+}
+
+// resolveCustomProp resolves one custom property's value, memoising as it goes.
+//
+// visiting is the chain currently being resolved, which is what turns
+// `--a: var(--b); --b: var(--a)` into a reported cycle instead of a hang: there
+// is no least fixed point, so there is no value to substitute.
+//
+// The recursion resolves every reference *before* substituting, and substitutes
+// against a view in which resolved entries are already final. Resolving the
+// reference as it is encountered instead makes the result depend on map
+// iteration order: `--ink: var(--fg)` fails with "not defined" whenever `--ink`
+// happens to be visited before `--fg`. That bug is invisible in a single run and
+// appears intermittently under -count, which is why the order is fixed here
+// rather than left to the map.
+func resolveCustomProp(name string, lookup, resolved map[string]string, visiting []string) (string, error) {
+	if v, ok := resolved[name]; ok {
+		return v, nil
+	}
+	for _, seen := range visiting {
+		if seen == name {
+			return "", fmt.Errorf("custom property cycle: %s",
+				strings.Join(append(visiting, name), " -> "))
+		}
+	}
+	value, ok := lookup[name]
+	if !ok {
+		return "", fmt.Errorf("is not defined")
+	}
+	if !strings.Contains(value, "var(") {
+		v := strings.TrimSpace(value)
+		resolved[name] = v
+		return v, nil
+	}
+	inner := append(append([]string{}, visiting...), name)
+	for _, ref := range referencedNames(value) {
+		if _, done := resolved[ref]; done {
+			continue
+		}
+		if _, declared := lookup[ref]; !declared {
+			continue // undefined: substituteVars reports it, or the fallback wins
+		}
+		if _, err := resolveCustomProp(ref, lookup, resolved, inner); err != nil {
+			return "", err
+		}
+	}
+	view := make(map[string]string, len(lookup))
+	for k, v := range lookup {
+		view[k] = v
+	}
+	for k, v := range resolved {
+		view[k] = v
+	}
+	out, err := substituteVars(value, view, visiting)
+	if err != nil {
+		return "", err
+	}
+	out = strings.TrimSpace(out)
+	resolved[name] = out
+	return out, nil
+}
+
+// referencedNames lists the custom properties a value refers to.
+func referencedNames(value string) []string {
+	var out []string
+	for i := 0; i+4 <= len(value); i++ {
+		if value[i:i+4] != "var(" {
+			continue
+		}
+		depth := 0
+		end := len(value)
+		for j := i + 4; j < len(value); j++ {
+			if value[j] == '(' {
+				depth++
+			} else if value[j] == ')' {
+				if depth == 0 {
+					break
+				}
+				depth--
+			} else if depth == 0 && (value[j] == ',' || value[j] == ' ' || value[j] == '\t') {
+				end = j
+				break
+			}
+		}
+		inner := value[i+4 : min(end, len(value))]
+		name := inner
+		if c := splitVarFallback(inner); c >= 0 {
+			name = inner[:c]
+		}
+		if name = strings.TrimSpace(name); isCustomProperty(name) {
+			out = append(out, name)
+		}
+		i += 3
+	}
+	return out
 }
 
 // apply sets one already-validated declaration on st. The typed parsers
@@ -151,12 +382,12 @@ func apply(st *ComputedStyle, d Declaration) error {
 			return err
 		}
 		st.BorderWidth[sideIndex(d.Property)] = v
-	case "border-color":
+	case "border-top-color", "border-right-color", "border-bottom-color", "border-left-color":
 		v, err := parseColorValue(d.Value)
 		if err != nil {
 			return err
 		}
-		st.BorderColor = v
+		st.BorderColor[sideIndex(d.Property)] = v
 	case "background-color":
 		v, err := parseColorValue(d.Value)
 		if err != nil {

@@ -72,7 +72,7 @@ What to look for — every item here is something you can *see or do* in the win
 - clicking *add* inserts a new row rather than replacing the list
 - closing the window, or Ctrl-C, exits with status 0
 
-What is **not** checked here, and is not an M5 criterion: whether the layout *looks like a browser page*. The M5 CSS subset has no inline flow, no percentage heights, no margin collapsing and no CSS Grid, so spacing is visibly wrong in ways the subset cannot yet express. Those gaps are enumerated in the gap register (`npm run report:dashboard`) and are proposed for closure in [DRR-008](evidence/records/2026-10-08_dashboard-target.md) (open — the sequence is not yet approved). Pixel stability of the pipeline is pinned separately by the golden test.
+What is **not** checked here, and is not an M5 criterion: whether the layout *looks like a browser page*. The M5 CSS subset has no inline flow, no percentage heights, no margin collapsing and no CSS Grid, so spacing is visibly wrong in ways the subset cannot yet express. Those gaps are enumerated in the gap register (`npm run report:dashboard`) and are proposed for closure in [DRR-008](evidence/records/2026-10-08_dashboard-target.md) (confirmed 2026-10-08). Pixel stability of the pipeline is pinned separately by the golden test.
 
 Rebuild the bundle first if you edited the slice:
 

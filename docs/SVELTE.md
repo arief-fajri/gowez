@@ -211,11 +211,11 @@ npm run report:dashboard -- --json  # the full register
 The sample is out of the subset by design, so this table is the honest statement
 of what a M5 application may not use.
 
-**Current baseline: 139 findings across 7 modules** (2026-10-08). This number is
+**Current baseline: 197 findings across 7 modules** (123 `CSS-PROPERTY`), re-measured
+2026-10-08 after the register was corrected — see below. This number is
 why it is a script rather than prose: it is the candidate acceptance metric for
 the follow-on milestones, proposed in
-[DRR-008](../evidence/records/2026-10-08_dashboard-target.md) (open, not yet
-approved). Note what it does **not** measure — it counts *rejections*, so a
+[DRR-008](../evidence/records/2026-10-08_dashboard-target.md) (confirmed 2026-10-08). Note what it does **not** measure — it counts *rejections*, so a
 construct that compiles to wrong output is invisible to it (component style
 scoping was such a defect; see §Component style scoping).
 
@@ -235,7 +235,7 @@ scoping was such a defect; see §Component style scoping).
   | `SVELTE-UNSUPPORTED-NODE` | 2 | svelte | a node type outside the subset; also an event outside the event table |
   | `DOM-GLOBAL` | 29 | dom | `document` `window` `location` `history` `navigator` `setTimeout` `setInterval` `fetch` `console` `process` and the DOM constructor set |
   | `DOM-API`, `DOM-FUNCTION` | 0 | dom | a call to one of the above |
-  | `CSS-PROPERTY` | 65 | css | a property or value outside the CSS subset — grid, `overflow-*`, `border-radius`, `box-shadow`, `transition`, `position`, `z-index`, `var()`, `color-mix()`, percentage heights |
+  | `CSS-PROPERTY` | 123 | css | a property or value outside the CSS subset — grid, `overflow-*`, `border-radius`, `box-shadow`, `transition`, `position`, `z-index`, percentage heights. `var()` and `color-mix()` are **supported** since M6a |
 |`CSS-AT-RULE` | 2 | css | `@media`, `@supports`, `@keyframes` — the subset has none |
 |`CSS-SELECTOR` | 4 | css | a selector outside the subset, named explicitly: an unsupported pseudo-class (`:last-child`, `:nth-child`, …), a pseudo-element (`::placeholder`), or a combinator other than descendant (`>`, `+`, `~`) |
 |`CSS-SCOPE-COLLISION` | 0 | css | two modules derive the same style scope, which would merge their styles back together |

@@ -33,7 +33,13 @@ export const ALLOWED_PROPERTIES = new Set([
   'border-bottom-width',
   'border-left-width',
   'border-color',
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
   'background-color',
+  'list-style',
+  'outline',
   'color',
   'font-size',
   'flex-direction',
@@ -95,19 +101,110 @@ const box: Grammar = (value) => {
   return null;
 };
 
-/** color accepts hex forms and three keywords — parseColorValue. */
+/** color accepts hex forms, three keywords, and color-mix(in srgb, …) —
+ * parseColorValue. */
 const color: Grammar = (value) => {
-  if (value.startsWith('#')) {
-    const hex = value.slice(1);
+  const v = value.trim();
+  if (v.startsWith('color-mix(')) return colorMix(v);
+  if (v.startsWith('#')) {
+    const hex = v.slice(1);
     if (![3, 4, 6, 8].includes(hex.length)) {
       return `want #RGB, #RRGGBB or #RRGGBBAA`;
     }
     if (!/^[0-9a-fA-F]+$/.test(hex)) return `invalid hex color`;
     return null;
   }
-  if (['black', 'white', 'transparent'].includes(value)) return null;
+  if (['black', 'white', 'transparent'].includes(v)) return null;
   return `unsupported color (docs/CSS-SUBSET.md)`;
 };
+
+/**
+ * colorMix mirrors parseColorMixValue's *verdict* — not its arithmetic, which
+ * only Go performs. What matters here is agreeing on which inputs are legal:
+ * `in srgb` only, exactly two colours, percentages in range and summing to 100
+ * when both are given.
+ *
+ * A space other than `in srgb` is refused rather than quietly mixed in srgb
+ * anyway, which would return a different colour from every browser.
+ */
+const colorMix: Grammar = (value) => {
+  if (!value.endsWith(')')) return `unterminated color-mix()`;
+  const inner = value.slice('color-mix('.length, -1).trim();
+  const commas = splitTopLevelCommas(inner);
+  if (commas.length < 1) return `want color-mix(in srgb, <color>, <color>)`;
+  const space = commas[0]!.text;
+  if (space.toLowerCase() !== 'in srgb') {
+    return `only 'in srgb' is supported; "${space}" would mix in a different space and give a different colour`;
+  }
+  const clauses = commas.slice(1).map((c) => c.text);
+  if (clauses.length !== 2) return `want exactly two colours, got ${clauses.length}`;
+  let sum = 0;
+  let seen = 0;
+  for (const clause of clauses) {
+    const fields = clause.split(/\s+/).filter(Boolean);
+    if (fields.length === 0 || fields.length > 2) {
+      return `want a colour and an optional percentage, got "${clause}"`;
+    }
+    const err = color(fields[0]!);
+    if (err) return err;
+    if (fields.length === 2) {
+      const pct = fields[1]!;
+      if (!pct.endsWith('%')) return `percentage must end in %, got "${pct}"`;
+      const n = Number(pct.slice(0, -1));
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return `percentage ${pct} is outside 0%-100%`;
+      }
+      sum += n;
+      seen++;
+    }
+  }
+  if (seen === 2 && Math.abs(sum - 100) > 1e-9) {
+    return `percentages must sum to 100%, got ${sum}%`;
+  }
+  return null;
+};
+
+/** splitTopLevelCommas splits on commas outside parentheses, keeping each
+ * piece, so the space clause can be read off the front. */
+function splitTopLevelCommas(s: string): Array<{ text: string }> {
+  const out: Array<{ text: string }> = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    else if (ch === ',' && depth === 0) {
+      out.push({ text: s.slice(start, i).trim() });
+      start = i + 1;
+    }
+  }
+  out.push({ text: s.slice(start).trim() });
+  return out;
+}
+
+/** splitTopLevelFields splits on whitespace outside parentheses, so
+ * `color-mix(in srgb, #f00, #fff)` stays one field instead of becoming five. */
+function splitTopLevelFields(s: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && ch !== undefined && /\s/.test(ch)) {
+      if (start >= 0) {
+        out.push(s.slice(start, i));
+        start = -1;
+      }
+      continue;
+    }
+    if (start < 0) start = i;
+  }
+  if (start >= 0) out.push(s.slice(start));
+  return out;
+}
 
 /** fontSize accepts a positive px length — parseFontSizeValue. */
 const fontSize: Grammar = (value) => {
@@ -123,6 +220,33 @@ function keywords(allowed: string[], note = ''): Grammar {
     allowed.includes(value)
       ? null
       : `unsupported value${note ? ` (${note})` : ''} (docs/CSS-SUBSET.md)`;
+}
+
+/**
+ * noneOnly accepts exactly `none`.
+ *
+ * Used for `list-style` and `outline`. The subset honours `none` because the
+ * outcome is already true — there is no list marker and no outline in the render
+ * pipeline — not because the declaration is ignored. Every other value is
+ * refused, because accepting `outline: 2px solid red` would claim an effect the
+ * runtime does not produce.
+ */
+const noneOnly: Grammar = (value) =>
+  value === 'none'
+    ? null
+    : 'only none is supported (the subset paints no list marker and no outline)';
+
+/** colors1to4 mirrors kindColorSides: 1–4 colours, expanded per side. */
+function colors1to4(what: string): Grammar {
+  return (value) => {
+    const parts = splitTopLevelFields(value.trim());
+    if (parts.length < 1 || parts.length > 4) return `want 1-4 ${what}, got "${value}"`;
+    for (const p of parts) {
+      const err = color(p);
+      if (err) return err;
+    }
+    return null;
+  };
 }
 
 const GRAMMARS: Record<string, Grammar> = {
@@ -144,8 +268,14 @@ const GRAMMARS: Record<string, Grammar> = {
   'border-right-width': px,
   'border-bottom-width': px,
   'border-left-width': px,
-  'border-color': color,
+  'border-color': colors1to4('colors'),
+  'border-top-color': color,
+  'border-right-color': color,
+  'border-bottom-color': color,
+  'border-left-color': color,
   'background-color': color,
+  'list-style': noneOnly,
+  outline: noneOnly,
   color,
   'font-size': fontSize,
   'flex-direction': keywords(['row', 'column']),
@@ -199,33 +329,101 @@ export const KNOWN_GAPS = new Set([
 ]);
 
 /**
+ * cssSubsetErrors returns one message per rejected declaration, in source
+ * order, and an empty array when the whole rule is in the subset.
+ *
+ * The register needs *every* rejection, not the first. An earlier version threw
+ * on the first bad declaration, so report mode recorded one finding per rule and
+ * the register counted rules rather than gaps: `.app { display: grid;
+ * grid-template-columns: 240px 1fr; height: 100dvh }` reported only
+ * `display: grid`, hiding two more problems behind it. That made the number a
+ * lower bound that could *stay flat* while a milestone closed a property — or
+ * rise as earlier failures unmasked later ones — which is precisely the shape of
+ * a gate that cannot fail honestly.
+ */
+export function cssSubsetErrors(
+  declarations: ReadonlyArray<{ property: string; value: string }>,
+  file = '',
+): string[] {
+  const where = file ? `${file}: ` : '';
+  const errors: string[] = [];
+  for (const { property, value } of declarations) {
+    if (property.startsWith('@')) {
+      errors.push(`${where}at-rule ${property} is not in the CSS subset`);
+      continue;
+    }
+    if (value.includes('!')) {
+      errors.push(`${where}${property}: !important is not supported`);
+      continue;
+    }
+    // A custom property holds an untyped token stream; only the property that
+    // consumes it interprets the value, so nothing is checked here.
+    if (isCustomProperty(property)) {
+      if (!balancedParens(value)) {
+        errors.push(`${where}${property}: unbalanced parentheses in the custom property value`);
+      }
+      continue;
+    }
+    // Property existence is checked FIRST, before any var() deferral. A
+    // deferral that ran first would accept `background: var(--x)` and
+    // `grid-template-columns: var(--x)` — the property is unknown regardless of
+    // what its value turns out to be, and Go rejects it at that point too.
+    const grammar = GRAMMARS[property];
+    if (!grammar) {
+      const kind = KNOWN_GAPS.has(property) ? 'documented gap' : 'unsupported property';
+      errors.push(`${where}${property} is a ${kind} (docs/CSS-SUBSET.md)`);
+      continue;
+    }
+    // A value containing var() cannot be validated yet: substitution happens
+    // per node at resolve time, after the cascade. Deferring does not weaken
+    // the check — the Go resolve re-parses the substituted text — but this
+    // mirror genuinely cannot do it, which is the one place the two
+    // implementations differ in reach rather than in verdict.
+    if (value.includes('var(')) {
+      if (!balancedParens(value)) {
+        errors.push(`${where}${property}: unterminated var( in "${value}"`);
+      }
+      continue;
+    }
+    const err = grammar(value.trim());
+    if (err) {
+      errors.push(`${where}${property}: "${value}": ${err}`);
+    }
+  }
+  return errors;
+}
+
+/** isCustomProperty mirrors the Go isCustomProperty. */
+function isCustomProperty(name: string): boolean {
+  return name.startsWith('--') && name.length > 2;
+}
+
+/** balancedParens mirrors the Go balancedParens: every ( has a matching ). */
+function balancedParens(value: string): boolean {
+  let depth = 0;
+  for (const ch of value) {
+    if (ch === '(') depth++;
+    else if (ch === ')') {
+      depth--;
+      if (depth < 0) return false;
+    }
+  }
+  return depth === 0;
+}
+
+/**
  * validateCssSubset throws on the first declaration the subset rejects.
  *
  * It is a throwing validator rather than a collector: a strict build wants the
- * failure, and report mode catches it and converts it into a finding.
+ * failure and the first one is the actionable one. Report mode uses
+ * cssSubsetErrors instead, because a gap register has to be complete.
  */
 export function validateCssSubset(
   declarations: ReadonlyArray<{ property: string; value: string }>,
   file = '',
 ): void {
-  const where = file ? `${file}: ` : '';
-  for (const { property, value } of declarations) {
-    if (property.startsWith('@')) {
-      throw new Error(`${where}at-rule ${property} is not in the CSS subset`);
-    }
-    if (value.includes('!')) {
-      throw new Error(`${where}${property}: !important is not supported`);
-    }
-    const grammar = GRAMMARS[property];
-    if (!grammar) {
-      const kind = KNOWN_GAPS.has(property) ? 'documented gap' : 'unsupported property';
-      throw new Error(`${where}${property} is a ${kind} (docs/CSS-SUBSET.md)`);
-    }
-    const err = grammar(value.trim());
-    if (err) {
-      throw new Error(`${where}${property}: "${value}": ${err}`);
-    }
-  }
+  const errors = cssSubsetErrors(declarations, file);
+  if (errors.length > 0) throw new Error(errors[0]!);
 }
 
 /** cssGapProperties lists the documented out-of-subset properties. */

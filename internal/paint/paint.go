@@ -50,7 +50,7 @@ func drawNode(r render.Renderer, n *ui.Node, res *layout.Result, styles map[ui.N
 	if cs.BackgroundColor&0xff != 0 {
 		r.DrawRect(g.Border.X*scale, g.Border.Y*scale, g.Border.W*scale, g.Border.H*scale, toColor(cs.BackgroundColor))
 	}
-	if cs.BorderColor&0xff != 0 {
+	if anyBorderOpaque(cs) {
 		drawBorders(r, g.Border, cs, scale)
 	}
 	if n.Kind == ui.TextNode {
@@ -69,24 +69,36 @@ func drawNode(r render.Renderer, n *ui.Node, res *layout.Result, styles map[ui.N
 	return nil
 }
 
+// anyBorderOpaque reports whether any side has a visible border.
+//
+// A per-side colour can be transparent while another is not — the whole point of
+// `border-bottom: 1px solid red` — so this cannot be a single alpha check.
+func anyBorderOpaque(cs style.ComputedStyle) bool {
+	for _, c := range cs.BorderColor {
+		if c&0xff != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // drawBorders fills the four border edges of a box (top, right, bottom,
 // left), skipping zero-width sides.
 func drawBorders(r render.Renderer, b ui.Box, cs style.ComputedStyle, scale float64) {
-	col := toColor(cs.BorderColor)
 	t, rt, bo, le := cs.BorderWidth[0], cs.BorderWidth[1], cs.BorderWidth[2], cs.BorderWidth[3]
 	x, y, w, h := b.X, b.Y, b.W, b.H
 
-	if t > 0 {
-		r.DrawRect(x*scale, y*scale, w*scale, t*scale, col)
+	if t > 0 && cs.BorderColor[0]&0xff != 0 {
+		r.DrawRect(x*scale, y*scale, w*scale, t*scale, toColor(cs.BorderColor[0]))
 	}
-	if bo > 0 {
-		r.DrawRect(x*scale, (y+h-bo)*scale, w*scale, bo*scale, col)
+	if bo > 0 && cs.BorderColor[2]&0xff != 0 {
+		r.DrawRect(x*scale, (y+h-bo)*scale, w*scale, bo*scale, toColor(cs.BorderColor[2]))
 	}
-	if le > 0 {
-		r.DrawRect(x*scale, (y+t)*scale, le*scale, (h-t-bo)*scale, col)
+	if le > 0 && cs.BorderColor[3]&0xff != 0 {
+		r.DrawRect(x*scale, (y+t)*scale, le*scale, (h-t-bo)*scale, toColor(cs.BorderColor[3]))
 	}
-	if rt > 0 {
-		r.DrawRect((x+w-rt)*scale, (y+t)*scale, rt*scale, (h-t-bo)*scale, col)
+	if rt > 0 && cs.BorderColor[1]&0xff != 0 {
+		r.DrawRect((x+w-rt)*scale, (y+t)*scale, rt*scale, (h-t-bo)*scale, toColor(cs.BorderColor[1]))
 	}
 }
 

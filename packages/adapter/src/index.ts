@@ -20,7 +20,7 @@ import { resolveGraph, projectRelative } from './graph.js';
 import { EMITTED_GLOBALS, RUNTIME } from './runtime.js';
 import { factoryName } from './codegen.js';
 import { MANIFEST_SCHEMA_VERSION, SVELTE_MAJOR, scopeOf, scopesCollide } from './subset.js';
-import { validateCssSubset } from './css.js';
+import { cssSubsetErrors, validateCssSubset } from './css.js';
 import {
   recordComponentSpecifiers,
   walk,
@@ -142,18 +142,35 @@ export function build(options: BuildOptions): BuildResult {
       scope: scopeOf(rel),
       componentEntry: (specifier) => componentEntry(resolveSpecifier(displayPath, specifier)),
       validateCss: (rule, file, line) => {
-        // CSS findings are collected rather than thrown so report mode can show
-        // the full picture; strict mode turns them into a CompileError below.
-        try {
-          validateCss(rule.declarations, file);
-        } catch (err) {
+        // Strict mode wants the first failure (it is the actionable one) and
+        // turns it into a CompileError below. Report mode must be *complete*:
+        // it is the gap register the milestone gates are read from, and a
+        // register that stops at the first error in a rule undercounts — it
+        // would hide `grid-template-*` behind an earlier `display: grid` in the
+        // same rule and make the count both wrong and non-monotonic.
+        if (mode === 'strict') {
+          try {
+            validateCss(rule.declarations, file);
+          } catch (err) {
+            report.add({
+              code: cssCodeOf(err),
+              category: 'css',
+              file,
+              line,
+              column: 0,
+              message: err instanceof Error ? err.message : String(err),
+            });
+          }
+          return;
+        }
+        for (const message of cssSubsetErrors(rule.declarations, file)) {
           report.add({
-            code: cssCodeOf(err),
+            code: message.includes('at-rule') ? 'CSS-AT-RULE' : 'CSS-PROPERTY',
             category: 'css',
             file,
             line,
             column: 0,
-            message: err instanceof Error ? err.message : String(err),
+            message,
           });
         }
       },

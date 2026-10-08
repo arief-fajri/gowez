@@ -159,7 +159,7 @@ func parseDeclarationBlock(src string, i int, term byte) ([]Declaration, int, er
 		if i == nameStart {
 			return nil, i, errAt(src, nameStart, "unexpected %q where a property name was expected", string(src[nameStart]))
 		}
-		if !isIdentStart(src[nameStart]) {
+		if !isIdentStart(src[nameStart]) && !isCustomPropertyName(src[nameStart:i]) {
 			return nil, i, errAt(src, nameStart, "invalid property name %q", src[nameStart:i])
 		}
 		name := src[nameStart:i]
@@ -187,8 +187,30 @@ func parseDeclarationBlock(src string, i int, term byte) ([]Declaration, int, er
 			i++
 		}
 		value := strings.TrimSpace(src[valStart:i])
-		if value == "" {
+		// A custom property may be declared empty (`--ink: ;`). CSS treats that
+		// as "set but empty", and var(--ink) must then fall back rather than
+		// resolve to nothing — so the value cannot be rejected here.
+		if value == "" && !isCustomProperty(name) {
 			return nil, i, errAt(src, nameStart, "property %q: missing value", name)
+		}
+
+		// A custom property is not in the typed table: its value is an untyped
+		// token stream that only the consuming property interprets.
+		if isCustomProperty(name) {
+			expanded, err := parseCustomProperty(name, value)
+			if err != nil {
+				return nil, i, errAt(src, valStart, "%s: %v", name, err)
+			}
+			decls = append(decls, expanded...)
+			next, err = skipWS(src, i)
+			if err != nil {
+				return nil, i, err
+			}
+			i = next
+			if i < len(src) && src[i] == ';' {
+				i++
+			}
+			continue
 		}
 
 		spec, ok := properties[name]

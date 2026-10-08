@@ -2,8 +2,74 @@
 
 - **Date:** 2026-10-08
 - **Author:** agent (raised from a visual triage of the M5 slice)
-- **Status:** open — awaiting human confirmation
+- **Status:** ✅ confirmed 2026-10-08 (see Confirmation)
 - **Decision class:** B (MVP scope change; requires explicit human confirmation)
+
+## Correction (2026-10-08, during M6a planning)
+
+**The baseline in this record was wrong, and so were the gates derived from it.**
+
+The register reported **139 findings**. Planning M6a against it exposed that the
+adapter's CSS validator **throws on the first bad declaration in a rule**, so
+report mode recorded one finding per *rule* rather than per *problem*:
+
+```
+.app { display: grid; grid-template-columns: 240px 1fr; height: 100dvh }
+```
+
+reported only `display: grid`, hiding two more. `font-family`, `box-shadow`,
+`grid-template-rows`, `100dvh` — none of them appeared anywhere in the register,
+and all of them are in the sample.
+
+`cssSubsetErrors` now collects every rejection, so the true baseline is:
+
+| | `CSS-PROPERTY` | total |
+|---|---|---|
+| before the fix (one finding per rule) | 65 | 139 |
+| **after the fix (complete register)** | **185** | **259** |
+| after M6a (`var()`, custom properties, `color-mix()`, `list-style`, `outline`) | **123** | **197** |
+
+This is worth stating plainly because it invalidates the *point* of a finding
+budget. A count that under-reports is not merely imprecise, it is **non-monotonic
+in the wrong direction**: closing one property can unmask two others behind it,
+so the number can stay flat or rise while a milestone makes real progress — and a
+gate of the form "the count must fall" would then fail for the right work. Any
+future instrument that decides whether a milestone succeeded has to be able to
+see the whole thing first.
+
+**Classification:** D — missing observability. The runtime never misbehaved; the
+measurement did, and it was the measurement every gate depended on.
+
+### Corrected buckets (measured, not estimated)
+
+| Bucket | findings | milestone |
+|---|---|---|
+| `background` / `border` / `border-<side>` shorthands | 34 | M6b |
+| `border-radius` | 12 | M6d |
+| `font-weight` | 12 | M6c |
+| `font-variant-numeric` | 5 | M11 |
+| layout (`line-height`, `min`/`max`, `margin: auto`, `overflow`, `white-space`, `height`, `flex`, `align-items`, `justify-content`, `text-overflow`) | 29 | M7 |
+| grid (`display: grid`, `grid-template-*`, `grid-column`, `place-items`) | 9 | M8 |
+| typography (`font`, `font-family`, `text-align`, `letter-spacing`, `text-transform`) | 8 | M7 |
+| transitions | 5 | M10 |
+| `cursor`, `box-shadow` | 3 | M10 / M6d |
+
+### Corrected gates
+
+| Step | `CSS-PROPERTY` gate |
+|---|---|
+| baseline | 185 |
+| **M6a** `var()` + custom properties + `color-mix()` + `list-style` + `outline` | **123** ✅ achieved |
+| M6b shorthands | 123 → **89** |
+| M6c `font-weight` | 89 → **77** |
+| M6d `border-radius` | 77 → **65** |
+| M7 layout | 65 → **36** |
+| M8 grid | 36 → **27** |
+| M11 `font-variant-numeric` | 27 → **22** |
+
+The remaining 22 (`transition`, `white-space`, `font`, `text-align`,
+`letter-spacing`, `text-transform`, `cursor`, `box-shadow`, `display: inline`)
+belong to M9/M10.
 
 ## Context
 
@@ -21,7 +87,7 @@ dashboard — then established three things:
    real; a *fidelity* claim would not have been.
 2. **`examples/dashboard` has never been a target.** It was deliberately written as a
    browser test bed — "deliberately outside the M5 subset" per [docs/SVELTE.md](../../docs/SVELTE.md)
-   — so its 139 adapter findings were an acceptable standing measurement rather than a
+   — so its adapter findings were an acceptable standing measurement rather than a
    backlog. Making it a target changes what that number means.
 3. **The triage found a defect the gap register could not see.** Component styles were
    never scoped, so 8 selectors were declared by more than one module and the last rule
@@ -37,7 +103,8 @@ falsifiable.
 
 ## Baseline measurement (2026-10-08)
 
-`npm run report:dashboard` — **139 findings across 7 modules**:
+`npm run report:dashboard` — the measurement is in the *Correction* section below; the
+original reading of this record was wrong.
 
 | Code | Count | What it rejects |
 |---|---|---|
@@ -89,13 +156,13 @@ One milestone absorbs every bucket.
 Each milestone closes one capability bucket and lowers the finding budget by a measured
 amount. Each is separately falsifiable and separately shippable.
 
-| MS | Bucket | Gate (finding budget from today's 139) |
+| MS | Bucket | Gate (finding budget — see Correction) |
 |---|---|---|
 | **M6** | Paint & value — `background`/`border` shorthands, `border-radius`, `font-weight`, `list-style`, `outline`, custom properties + `var()`, `color-mix()` | CSS findings 71 → **≤25**; **no change to `internal/layout`** |
 | **M7** | Layout engine — inline flow, `line-height`, `min-*`/`max-*`, `margin: auto`, `height: 100%`, `box-sizing`, `overflow` + clipping | CSS → **≤12**; prose renders on one line |
 | **M8** | CSS Grid + `@media` — a second layout algorithm, so **its own DRR** | CSS → **≤2**; dashboard shell lays out correctly |
 | **M9** | Host capability — bounded timers, `location`/`hashchange` + router, document head, element lookup. **Own DRR**: it reverses a deliberate exclusion in [docs/SCRIPT.md](../../docs/SCRIPT.md) | `DOM-GLOBAL` 29 → **0**; routing navigates |
-| **M10** | Widget & animation — `<table>` layout, `<select>` popup, `in:fade`/`transition:*` | **139 → 0**; all six pages render and navigate |
+| **M10** | Widget & animation — `<table>` layout, `<select>` popup, `in:fade`/`transition:*` | all six pages render and navigate |
 
 Two mechanisms make each gate real rather than asserted:
 
@@ -133,7 +200,7 @@ Reasons:
   `docs/SCRIPT.md` and gets its own DRR. Each of those deserves a separate decision, and
   bundling them behind one gate would hide them.
 - **The per-capability fixture follows from the same lesson as the scoping fix.** The
-  scoping defect survived 139 published findings because the register measures
+  scoping defect survived a published register that measured
   *rejections*. Accepting the target therefore requires evidence per capability, not one
   aggregate number and one aggregate image.
 
@@ -181,10 +248,53 @@ to the human, which is why this record is open.
 
 ## Confirmation
 
-**Human approver:** ____________________  **Date:** ____________
+**Human approver:** arief-fajri (repo owner)
+**Date:** 2026-10-08
+**Outcome:** confirmed, including the M6–M10 sequence as proposed.
 
-Required before implementation. Silence is not approval (AGENTS.md → Decision authority);
-this record stays `open` until it is signed.
+Confirmed together: that `examples/dashboard` becomes the target application, that
+the gap register becomes the acceptance metric, and the five-milestone order
+(M6 paint & value → M7 layout engine → M8 CSS Grid → M9 host capabilities → M10
+widgets & animation). The roadmap renumbering below is therefore in force;
+native APIs and packaging move behind the rendering program.
 
-On confirmation, the first implementation step is **M6 — paint & value**, whose design
-note is written before code, exactly as M5's was.
+Per the recommendation, the first implementation step is **M6 — paint & value**,
+and M6's design note is written and agreed before code.
+
+---
+
+## Roadmap change (in force on confirmation)
+
+| Milestone | Was | Now |
+|---|---|---|
+| M6 | Native APIs (fs, dialog, clipboard, window control) | Paint & value |
+| M7 | Packaging + benchmarks + sample app | Layout engine |
+| M8 | — | CSS Grid + `@media` |
+| M9 | — | Host capabilities (timers, routing, document head) |
+| M10 | — | Widgets & animation (table, select, transitions) |
+| M11 | — | Text capabilities: OpenType features (`font-variant-numeric`, `tabular-nums`) |
+| later | — | Native APIs, then packaging |
+
+Nothing is deleted: `examples/gowez-dashboard` remains the committed fast
+regression slice, so the runtime stays demonstrable at every point in the
+program.
+
+### M11 — why it exists, and why it is not in M6
+
+Added after planning M6, because measurement showed `font-variant-numeric:
+tabular-nums` is **not implementable with the embedded font**. The Go faces
+(`goregular`, `gomedium`, `gobold` in `golang.org/x/image/font/gofont`) were
+inspected at the TTF table level: they contain `cmap`, `glyf`, `head`, `hmtx`
+and friends, and **no GSUB table at all** — therefore no OpenType features, ever.
+Accepting `tabular-nums` would draw every digit at its default width while the
+stylesheet claimed otherwise: a silent misrender, which is exactly what G-UPG-04
+forbids.
+
+So M6 does not accept the property, and M11 owns the whole class. M11 needs a
+font that actually ships a `tnum` feature, which is a **new vendored font asset
+and a licensing decision — Level B, own DRR when it starts**. Until then the
+finding stands, honestly reported.
+
+Weight is the opposite case and *is* in M6: Go Regular / Medium / Bold are three
+real faces with different metrics, so `font-weight` can select a genuinely
+different face rather than pretend.

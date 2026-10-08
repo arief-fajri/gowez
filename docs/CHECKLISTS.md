@@ -39,9 +39,9 @@ re-render per state change, diffed against the previous node tree by node id
 > *pipeline* (Svelte → adapter → bundle → sandbox → `ui.apply` → style → layout →
 > paint → pixels), not the visual result; regenerating it as capabilities land is
 > an improvement. What an application may not use is enumerated by the gap
-> register, and closing that gap register is the scope **proposed** in
-> [DRR-008](../evidence/records/2026-10-08_dashboard-target.md) (still open — the
-> M6–M10 sequence is not yet approved).
+> register, and closing that gap register is the scope of
+> [DRR-008](../evidence/records/2026-10-08_dashboard-target.md) (confirmed
+> 2026-10-08 — see the roadmap in README).
 
 - [x] Svelte component can be compiled — [`TestCompile`](../packages/adapter/test/compile.test.ts) (six in-subset fixtures, strict, zero findings), [`TestGowezDashboardMounts`](../tests/golden/bundle_test.go) (the committed bundle mounts, styles, lays out)
 - [x] Component styles are scoped to their component — [`scoping.test.ts`](../packages/adapter/test/scoping.test.ts) (10 tests: scope on every selector, on every element, per-module isolation, collision detection, combinator printing), [`TestBundleStylesAreScoped`](../tests/golden/bundle_test.go) (end-to-end through `internal/style`: each `<button>` resolves the padding declared by *its own* module — the leak that 8 dashboard selectors had)
@@ -108,3 +108,19 @@ The MVP counts as complete for **technical validation** when:
 - [x] Browser/Svelte compatibility limits are documented — [SVELTE.md](SVELTE.md) §Gap register (generated, test-asserted), §Divergences, §Svelte compatibility; [CSS-SUBSET.md](CSS-SUBSET.md) for the CSS half
 
 Reaching these does **not** mean the framework is production-ready — it only proves the architectural hypothesis is worth continuing.
+
+## Paint & value (M6)
+
+Scope authorised by [DRR-008](../evidence/records/2026-10-08_dashboard-target.md);
+design and per-step gates in the [M6 design note](../evidence/records/2026-10-08_m6-paint-and-value.md).
+The milestone gate is a **finding budget** in the gap register
+(`npm run report:dashboard`), not a claim of visual fidelity.
+
+- [x] **M6a** custom properties and `var()` — [vars_test.go](../internal/style/vars_test.go) (inheritance of the computed value, `var(--x, fallback)`, unset **and** empty fallback, cycle reported not hung, order-independence over a three-link chain, substitution inside a shorthand, and that a substituted value is still type-checked)
+- [x] **M6a** `color-mix(in srgb, …)` — premultiplied-alpha interpolation pinned per percentage case; every other colour space refused **by name**, because mixing in srgb while the author asked for oklch returns a different colour than any browser
+- [x] **M6a** `list-style: none` / `outline: none` — accepted because the outcome is already true (nothing paints a marker or an outline), and every other value is refused rather than swallowed ([parity cases](../tests/parity/parity.go))
+- [x] **M6a** per-side border colour — `ComputedStyle.BorderColor` is `[4]uint32`; `border-color` expands to four longhands; `drawBorders` skips a transparent side individually
+- [x] **M6a** the gap register is complete — [cssSubsetErrors](../packages/adapter/src/css.ts) collects every rejection instead of throwing on the first per rule. The baseline was **259**, not the 139 an earlier record published; the count is not monotonic while unmasked findings remain behind the first error in a rule
+- [ ] **M6b** `background` / `border` / `border-<side>` shorthands — gate `CSS-PROPERTY` 123 → 89
+- [ ] **M6c** `font-weight` — gate 89 → 77; golden must change (a real bold face, not faux bold)
+- [ ] **M6d** `border-radius` — gate 77 → 65; **extends the `render.Renderer` contract**, so it needs a G-UPG-03 changelog entry
