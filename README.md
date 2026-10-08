@@ -112,7 +112,7 @@ gowez/
 
 **The acceptance target is now `examples/dashboard`** — the full six-page admin app.
 Each milestone's gate is a measured drop in that app's gap register
-(`npm run report:dashboard`, **197 findings** after M6a; 259 before it, see
+(`npm run report:dashboard`, **276 findings** after explicit global-stylesheet routing; 259 before that route was included, see
 [DRR-008](evidence/records/2026-10-08_dashboard-target.md)), so a gate can fail
 identifiably instead of "the milestone did not finish". The M5 slice remains the
 committed fast regression fixture.

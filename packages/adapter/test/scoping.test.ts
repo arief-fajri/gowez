@@ -215,4 +215,35 @@ describe('selector gap reporting', () => {
     expect(findings.map((f) => f.code)).toEqual(['CSS-SELECTOR']);
     expect(findings[0]!.message).toMatch(/::placeholder is not in the CSS subset/);
   });
+
+  it('rejects attribute selectors even though the printer could print them', () => {
+    const root = project({
+      'src/App.svelte': `
+<p id="note">one</p>
+<style>
+  [id] { color: #ffffff; }
+</style>
+`,
+    });
+    const findings = report(root, 'src/App.svelte').findings;
+
+    // Printing [id] would let a strict build pass and then fail Go's
+    // stylesheet parser at startup, so the adapter rejects it by name instead.
+    expect(findings.map((f) => f.code)).toEqual(['CSS-SELECTOR']);
+    expect(findings[0]!.message).toMatch(/attribute selector \[id\] is not in the CSS subset/);
+  });
+
+  it('rejects universal selectors before Go has to reject the stylesheet', () => {
+    const root = project({
+      'src/App.svelte': `
+<p>one</p>
+<style>
+  * { color: #ffffff; }
+</style>
+`,
+    });
+    const findings = report(root, 'src/App.svelte').findings;
+    expect(findings.map((f) => f.code)).toEqual(['CSS-SELECTOR']);
+    expect(findings[0]!.message).toMatch(/universal selector \* is not in the CSS subset/);
+  });
 });

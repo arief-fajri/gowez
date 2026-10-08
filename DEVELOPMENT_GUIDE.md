@@ -112,6 +112,48 @@ The npm workspace exists for the Svelte toolchain (Strategy B, [DRR-007](evidenc
 
 `examples/gowez-dashboard/dist` is committed so the Go golden, bundle and integration tests run offline without npm. Regenerate it with `npm run build:sample` after changing the slice.
 
+### The two dashboards — different jobs, not two versions of one app
+
+There are two `dashboard` examples and they are **not** duplicates. They share no
+code; the only overlap is the file name `src/App.svelte`, which is a coincidence
+of layout and carries no maintenance burden because neither imports the other.
+
+| | `examples/gowez-dashboard` | `examples/dashboard` |
+|---|---|---|
+| Job | **fixture** — the smallest app that must always work | **target** — the app the runtime must grow to render |
+| Size | ~115 lines, 2 modules | ~1,940 lines, 8 modules + a global stylesheet |
+| Strict build | zero findings, today | 276 findings, by design |
+| Runs on | the Go runtime (window), offline | the browser (Vite), offline |
+| Purpose | prove the pipeline is not broken | measure how far the subset has come |
+
+The slice is what makes a regression *identifiable*. It exercises the full
+path — manifest → CSS → sandbox eval → `ui.apply` → style → layout → paint →
+pixels — in 102 ops, so when a capability change breaks something, this fixture
+says whether the pipeline broke or the app grew. It backs `tests/golden`,
+`tests/integration`, and the `internal/app` bundle and reactivity suites.
+
+Deleting it would leave **zero** end-to-end runtime coverage until the target
+application can mount, which is several milestones away — so the two coexist
+deliberately. If they ever *do* share code, that is the moment to merge them.
+
+**Browser guards for the target.** The target must keep working in the browser,
+so any change that touches it is verified there, not only through the adapter:
+
+```bash
+npm run dev -w @gowez/example-dashboard      # serve it
+npm run build -w @gowez/example-dashboard    # production build
+npm run preview -w @gowez/example-dashboard  # serve the production build
+```
+
+**Artifact rules for the target** (until a milestone defines otherwise):
+
+- Its Vite `dist/` is a **browser** artifact and is never fed to the Go runtime.
+- The adapter writes the runtime bundle to its own output directory; it is
+  built on demand for verification and is **not committed** while the register
+  is non-zero, so a broken bundle cannot masquerade as a passing artifact.
+- A successful mount is claimed only from the real runtime path, never from a
+  count of findings.
+
 ---
 
 ## 2. Milestone → package map
@@ -125,8 +167,19 @@ Create and touch only what the current milestone needs. The full tree exists as 
 | **M3** Interaction | `internal/ui` (events, hit testing), `internal/window` (input) | ✅ done 2026-10-06 ([EVENTS](docs/EVENTS.md)) |
 | **M4** JavaScript | `internal/script`, `internal/ipc`, `protocol/ipc.schema.json` (+ registry/permission gate wired from `internal/api`, `internal/permission`) | ✅ done 2026-10-07 ([SCRIPT](docs/SCRIPT.md), [DRR-004](evidence/records/2026-10-07_js-engine-goja.md)) |
 | **M5** Svelte | `packages/adapter`, `internal/ui` (applier), `internal/assets`, `internal/window` (text input), `examples/gowez-dashboard`, `examples/dashboard` | ✅ done 2026-10-07 ([SVELTE.md](docs/SVELTE.md)) |
-| **M6** Native API | `internal/api`, `internal/permission` | planned |
-| **M7** Packaging + benchmark | `cmd/`, `tests/bench/`, docs split | planned |
+| **M6** Paint & value | `internal/style`, `internal/paint`, `packages/adapter` (mirror), `internal/text` (faces) | 🔶 M6a done 2026-10-08 ([design note](evidence/records/2026-10-08_m6-paint-and-value.md)); M6b–d open |
+| **M7** Layout engine | `internal/layout`, `internal/style`, `internal/paint`, `internal/text` | planned |
+| **M8** CSS Grid + `@media` | `internal/layout` (second algorithm) | planned — **own DRR** |
+| **M9** Host capabilities | `internal/script`, `internal/api`, `internal/permission`, `internal/app` | planned — **own DRR** (reverses a [SCRIPT.md](docs/SCRIPT.md) exclusion) |
+| **M10** Widgets & animation | `internal/layout`, `internal/render`, `internal/paint` | planned |
+| **M11** Text capabilities | `internal/text` (OpenType features) | planned — **own DRR** (needs a font with a GSUB table) |
+| later | Native APIs, then packaging + benchmarks | `internal/api`, `internal/permission`, `cmd/`, `tests/bench/` | planned |
+
+Milestone → package map follows the roadmap confirmed in
+[DRR-008](evidence/records/2026-10-08_dashboard-target.md). `internal/api` and
+`internal/permission` (native APIs) and packaging were **previously** M6/M7;
+they moved behind the rendering program because the subset must be able to render
+the target application before the runtime can be given more OS surface.
 
 The JS engine is **goja** (pinned in `go.mod`; decision: [DRR-004](evidence/records/2026-10-07_js-engine-goja.md)). Host surface and limits: [docs/SCRIPT.md](docs/SCRIPT.md).
 

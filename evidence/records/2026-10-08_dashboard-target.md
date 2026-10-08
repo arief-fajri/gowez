@@ -1,4 +1,4 @@
-# DRR-008 — `examples/dashboard` becomes the target application; M6–M10 program
+# DRR-008 — `examples/dashboard` becomes the target application; M6–M11 program
 
 - **Date:** 2026-10-08
 - **Author:** agent (raised from a visual triage of the M5 slice)
@@ -70,6 +70,55 @@ measurement did, and it was the measurement every gate depended on.
 The remaining 22 (`transition`, `white-space`, `font`, `text-align`,
 `letter-spacing`, `text-transform`, `cursor`, `box-shadow`, `display: inline`)
 belong to M9/M10.
+
+## Correction — explicit global stylesheet route (measurement update; scope unchanged)
+
+The first correction measured only component `<style>` blocks. It omitted
+`examples/dashboard/src/styles/ui.css`, imported by Vite `main.ts`, because the
+adapter never executes `main.ts`. That omission meant shared classes were not
+inspected; a later mount could look styled while missing an entire stylesheet.
+
+The adapter now accepts explicit `globalStyles` (`BuildOptions` / CLI
+`--global-css`), parses them with the same CSS pipeline, reports them with
+their own project path, leaves them unscoped, and emits them before component
+CSS. The register command therefore includes the shared stylesheet:
+
+`npm run report:dashboard` → `--global-css src/styles/ui.css`
+
+Measured baseline with the shared stylesheet included:
+
+| | `CSS-PROPERTY` | total |
+|---|---|---|
+| component-only after M6a and strict-reporting fixes | 123 | 196 |
+| **with `src/styles/ui.css` included** | **198** | **276** |
+
+The shared stylesheet contributes 80 findings: 75 `CSS-PROPERTY`, 3
+`CSS-SELECTOR`, and 2 `CSS-AT-RULE`. The tables in the first correction are
+superseded for measurement only. Milestone ownership is unchanged except for
+three clarifications that were implicit before:
+
+- `color: inherit` (1) belongs to M7 as inheritance-keyword support;
+  `color` already inherits, so `inherit` is the honest keyword form.
+- `display: inline-flex` (2) belongs to M7 as a flex-container extension.
+- `box-shadow` (3) stays in M10; M6d is `border-radius` only, keeping the
+  renderer-contract change minimal.
+
+### Revised gates with the shared stylesheet included
+
+| Step | `CSS-PROPERTY` gate |
+|---|---|
+| baseline with global route | 198 |
+| M6b shorthands (`background` 40, `border` 11, `border-bottom` 6, `border-top` 1, `border-right` 1) | 198 → **139** |
+| M6c `font-weight` (24) | 139 → **115** |
+| M6d `border-radius` (18) | 115 → **97** |
+| M7 layout, typography, and `color: inherit` (58) | 97 → **39** |
+| M8 grid (16) | 39 → **23** |
+| M10 widgets, transitions, cursor, shadows, and table properties (17) | 23 → **6** |
+| M11 `font-variant-numeric` (6) | 6 → **0** |
+
+The M7/M8/M10/M11 assignments above preserve the ownership in the first
+correction; only the counts changed because the shared stylesheet is now
+measured.
 
 ## Context
 
@@ -250,12 +299,12 @@ to the human, which is why this record is open.
 
 **Human approver:** arief-fajri (repo owner)
 **Date:** 2026-10-08
-**Outcome:** confirmed, including the M6–M10 sequence as proposed.
+**Outcome:** confirmed, including the M6–M11 sequence as amended.
 
 Confirmed together: that `examples/dashboard` becomes the target application, that
-the gap register becomes the acceptance metric, and the five-milestone order
+the gap register becomes the acceptance metric, and the six-milestone order
 (M6 paint & value → M7 layout engine → M8 CSS Grid → M9 host capabilities → M10
-widgets & animation). The roadmap renumbering below is therefore in force;
+widgets & animation → M11 text capabilities). The roadmap renumbering below is therefore in force;
 native APIs and packaging move behind the rendering program.
 
 Per the recommendation, the first implementation step is **M6 — paint & value**,

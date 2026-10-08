@@ -16,6 +16,8 @@ export interface AppBuildOptions {
   outDir: string;
   /** Overridable for tests; defaults to the adapter's own CSS subset check. */
   validateCss?: BuildOptions['validateCss'];
+  /** Raw global stylesheets to validate and place before component CSS. */
+  globalStyles?: BuildOptions['globalStyles'];
 }
 
 export interface AppBuildResult {
@@ -37,6 +39,7 @@ export async function buildApp(options: AppBuildOptions): Promise<AppBuildResult
     entry: options.entry,
     mode: 'strict',
     validateCss: options.validateCss,
+    globalStyles: options.globalStyles,
   });
 
   const iife = await emitBundle(result.bundle);

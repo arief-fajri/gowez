@@ -10,7 +10,7 @@
  * adapter generates a small runtime whose only job is to re-run a module's
  * render function and submit the resulting ops through ui.apply.
  */
-import { parse } from 'svelte/compiler';
+import { parse, parseCss } from 'svelte/compiler';
 import {
   ATTRIBUTES,
   BOOLEAN_ATTRIBUTES,
@@ -37,11 +37,58 @@ const HTML_TAGS = new Set([
   'p', 'section', 'span', 'ul',
 ]);
 
-/** CssRule is one validated stylesheet rule from a component's <style> block. */
+/** CssRule is one validated stylesheet rule from component CSS or an explicit global stylesheet. */
 export interface CssRule {
   /** Type selector text as authored, e.g. "button" or "row:hover". */
   selector: string;
   declarations: Array<{ property: string; value: string }>;
+}
+
+/** GlobalStyleSource is one caller-supplied stylesheet read as raw CSS. */
+export interface GlobalStyleSource {
+  /** Path relative to the project root, used in findings. */
+  file: string;
+  /** Stylesheet text, such as a Vite-imported global CSS file. */
+  source: string;
+}
+
+/**
+ * collectGlobalStyles parses and validates caller-supplied raw CSS.
+ *
+ * A global stylesheet is not a component stylesheet: selectors are printed
+ * exactly as written (there is no Svelte-style "bare word means class" rule)
+ * and no scope class is added. Its validated rules come before component CSS
+ * because a shared stylesheet is the base layer that component styles refine.
+ */
+export function collectGlobalStyles(
+  sources: ReadonlyArray<GlobalStyleSource>,
+  report: Report,
+  validateCss: WalkOptions['validateCss'],
+): CssRule[] {
+  const rules: CssRule[] = [];
+  for (const source of sources) {
+    let sheet: Node;
+    try {
+      sheet = parseCss(source.source) as unknown as Node;
+    } catch (err) {
+      report.add({
+        code: 'CSS-UNKNOWN',
+        category: 'css',
+        file: source.file,
+        line: 0,
+        column: 0,
+        message: `global stylesheet could not be parsed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      continue;
+    }
+    rules.push(
+      ...collectCss({ css: sheet } as unknown as Node, source.file, report, {
+        validateCss,
+        global: true,
+      }),
+    );
+  }
+  return rules;
 }
 
 /** CompiledModule is the result of walking one .svelte file. */
@@ -89,6 +136,11 @@ export interface WalkOptions {
    * class, so a module's styles cannot reach another module's elements.
    */
   scope?: string;
+  /**
+   * Global stylesheets are printed without Svelte's bare-identifier-as-class
+   * convention: in raw CSS, `body` is an element selector, not `.body`.
+   */
+  global?: boolean;
   /**
    * Shared id allocator. One graph must allocate from one source: ids are the
    * adapter's address space, and two modules each starting at 1 would collide
@@ -193,7 +245,9 @@ export function walk(
     components.set(key.slice(file.length + 1), factoryNameFor(specifier));
   }
 
-  const generated = generateFactory(file, getScope(ast, 'instance'), getFragment(ast), components);
+  const generated = generateFactory(file, getScope(ast, 'instance'), getFragment(ast), components, {
+    report,
+  });
 
   return {
     file,
@@ -316,7 +370,7 @@ function walkFragment(
     }
 
     case 'KeyBlock': {
-      walkFragment(getFragmentOf(node), parentId, file, report, ops);
+      walkFragment(getFragmentOf(node), parentId, file, report, ops, opts);
       return;
     }
 
@@ -842,7 +896,11 @@ function collectCss(
     }
 
     if (current.type === 'Rule') {
-      const printed = printSelectorList(current.prelude as Node | undefined, opts.scope ?? null);
+      const printed = printSelectorList(
+        current.prelude as Node | undefined,
+        opts.scope ?? null,
+        opts.global ?? false,
+      );
       const declarations = declarationsOf(current);
       if ('unsupported' in printed) {
         finding(report, 'CSS-SELECTOR', current, file, printed.unsupported);
@@ -965,7 +1023,7 @@ function combinatorOf(rel: Node): CombinatorResult {
  * attaching the component scope class to the last compound of each selector —
  * the same subject-scoped form Svelte emits.
  */
-function printSelectorList(prelude: Node | undefined, scope: string | null): PrintResult {
+function printSelectorList(prelude: Node | undefined, scope: string | null, global = false): PrintResult {
   if (!prelude || prelude.type !== 'SelectorList') {
     return unprintable('selector list shape is not understood by the adapter');
   }
@@ -983,7 +1041,7 @@ function printSelectorList(prelude: Node | undefined, scope: string | null): Pri
       }
       const combinator = combinatorOf(rel);
       if ('unsupported' in combinator) return combinator;
-      const rendered = renderSimpleSelector(rel);
+      const rendered = renderSimpleSelector(rel, global);
       if ('unsupported' in rendered) return rendered;
       // The scope belongs on the last compound, because that compound is the
       // subject — and it goes *before* any pseudo-class, so `.row` scopes to
@@ -1006,7 +1064,7 @@ function printSelectorList(prelude: Node | undefined, scope: string | null): Pri
  * The chain lives under `.selectors`, not `.children` — reading the wrong field
  * is why an early version reported every selector as unprintable.
  */
-function renderSimpleSelector(rel: Node): PrintResult {
+function renderSimpleSelector(rel: Node, global = false): PrintResult {
   let out = '';
   // Pseudo parts are held back so the caller can place the scope class before
   // them: `.row` + `.s-app` + `:hover`, never `.row:hover.s-app`.
@@ -1015,18 +1073,17 @@ function renderSimpleSelector(rel: Node): PrintResult {
   for (const sel of chain) {
     switch (sel.type) {
       case 'TypeSelector': {
-        // A universal selector is written *.
         const name = (sel as { name?: unknown }).name;
-        if (name === null || name === undefined) {
-          out += '*';
-          continue;
+        if (name === null || name === undefined || name === '*') {
+          return unprintable(`universal selector * is not in the CSS subset (it can match generated content Go does not model)`);
         }
         // In a component's <style>, a bare identifier that is not a known HTML
         // tag names a *class* — that is how Svelte authors write `shell { }` for
         // `<section class="shell">`. Printing it as a tag selector would match
-        // nothing and silently drop every rule.
+        // nothing and silently drop every rule. Raw global CSS has no such
+        // convention: `body` is an element selector there.
         const tag = String(name);
-        out += HTML_TAGS.has(tag) ? tag : `.${tag}`;
+        out += global || HTML_TAGS.has(tag) ? tag : `.${tag}`;
         continue;
       }
       case 'ClassSelector':
@@ -1035,9 +1092,12 @@ function renderSimpleSelector(rel: Node): PrintResult {
       case 'IdSelector':
         out += `#${String((sel as { name?: unknown }).name ?? '')}`;
         continue;
-      case 'AttributeSelector':
-        out += printAttributeSelector(sel);
-        continue;
+      case 'AttributeSelector': {
+        const name = String((sel as { name?: unknown }).name ?? '');
+        return unprintable(
+          `attribute selector [${name}] is not in the CSS subset (type, class, id and :hover/:active/:focus only)`,
+        );
+      }
       case 'PseudoClassSelector': {
         const name = String((sel as { name?: unknown }).name ?? '');
         // :hover/:active/:focus are the M3 pseudo-classes the subset supports;
@@ -1063,18 +1123,6 @@ function renderSimpleSelector(rel: Node): PrintResult {
     }
   }
   return out === '' ? unprintable('empty selector') : { text: out, pseudo };
-}
-
-/** printAttributeSelector prints `[name]` or `[name="value"]`. */
-function printAttributeSelector(sel: Node): string {
-  const name = String((sel as { name?: unknown }).name ?? '');
-  const matcher = (sel as { matcher?: unknown }).matcher;
-  const value = (sel as { value?: { value?: unknown } | null }).value;
-  if (!matcher) return `[${name}]`;
-  const op = String(matcher);
-  const raw = value?.value;
-  if (raw === null || raw === undefined) return `[${name}]`;
-  return `[${name}${op === '=' ? '' : ` ${op}`} "${String(raw)}"]`;
 }
 
 /** checkGlobals rejects browser globals wherever they appear in a module. */

@@ -133,8 +133,15 @@ repeat arrives as repeated `KeyDown` with no matching extra `KeyUp`.
   (`script.Engine.FireHandler`). The JS side follows the same rule —
   inline, never blocking, bounded by the handler budget
   ([SCRIPT.md](SCRIPT.md)) — and a JS throw is isolated and observable
-  (G-REL-02), so dispatch continues. `ui.setText` is the script layer's
-  only tree-mutation door (inline, unknown ids rejected).
+  (G-REL-02), so dispatch continues.
+- **The mutation door depends on which UI path is running, and this changed in
+  M5.** The M1–M4 demo scene uses `ui.setText` as the script layer's only
+  tree-mutation door. A **compiled Svelte bundle** does not: it registers
+  exactly one method, `ui.apply`, carrying a whole instruction batch
+  ([SVELTE.md §The single mutation door](SVELTE.md#the-single-mutation-door-d-1)).
+  `ui.setText` is *not* registered on the bundle path, so one door stays
+  auditable (pinned by `TestBundleSceneRegistersOnlyUIApply`; recorded in
+  [GUARDRAILS.md §Changelog](GUARDRAILS.md#changelog)).
 
 ## Observability (P5)
 

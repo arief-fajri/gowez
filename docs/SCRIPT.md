@@ -71,7 +71,7 @@ handler surface as `*script.Error` (source + message + engine stack).
 
 ## Binding to UI events
 
-M4 wires listeners by hand in the scene
+M4 wires listeners by hand in the demo scene
 ([`internal/app/uiscene.go`](../internal/app/uiscene.go)):
 
 1. Go listener on a tree node (`ui.Click`, `ui.KeyDown`, …),
@@ -81,6 +81,14 @@ M4 wires listeners by hand in the scene
    `ui.setText` — the script layer's **only** tree-mutation door
    (inline on the UI goroutine, params `{nodeId, text}`, unknown ids
    rejected with `-32602`).
+
+**That last sentence is scoped to the demo scene.** M5 introduced a second UI
+path, and it deliberately uses a different door: a compiled Svelte bundle
+registers exactly one method, `ui.apply`, and submits a whole instruction batch
+through it. `ui.setText` is *not* registered while a bundle is loaded, so the
+bundle path has exactly one auditable mutation door and the demo path has
+exactly one — rather than two doors on one path
+([SVELTE.md §The single mutation door](SVELTE.md#the-single-mutation-door-d-1)).
 
 `FireHandler` failures (throw, timeout) are isolated: `JSExceptions` is
 counted and a `Diagnostic{Component:"script"}` is reported; dispatch

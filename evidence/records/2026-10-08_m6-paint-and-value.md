@@ -1,7 +1,7 @@
 # M6 — paint & value: design note
 
 - **Date:** 2026-10-08
-- **Status:** design agreed; M6a in progress
+- **Status:** design agreed; **M6a complete** (gated), M6b next
 - **Decision class:** A (no `protocol/` change, no root public API change, no new
   dependency). The M6 *scope* is authorised by
   [DRR-008](2026-10-08_dashboard-target.md); this note records how it is cut up
@@ -17,12 +17,13 @@ rather than quietly attempted:
    stack and the renderer. Bundled into one gate, a failure cannot name the
    capability that broke — the exact unfalsifiable gate DRR-008 rejected when it
    rejected "one big M6".
-2. **The number 25 was unreachable.** 22 findings are M7/M8 work (`line-height`
-   6, `display: grid` 3, `margin: auto` 3, `flex` 2, `max-width` 2, `min-width`
-   1, `overflow`/`overflow-y` 2, `height: 100%` 1, `align-items` 1,
-   `grid-column` 1), and those two at-rules are M8. Post-M6 CSS findings are 28,
-   not ≤25. The gate below is stated as a **closed count of
-   `CSS-PROPERTY`**, which is computable from the register rather than guessed.
+2. **The original number was unreachable even before the shared stylesheet was
+    measured.** The component-only tables named M7/M8 work that left post-M6 CSS
+    findings above the first proposed ceiling. With `src/styles/ui.css`
+    included explicitly, the M6 gates below are the only current numbers; later
+    gates live in DRR-008 §Correction and must be re-measured when those designs
+    land. The gate below is stated as a **closed count of
+    `CSS-PROPERTY`**, which is computable from the register rather than guessed.
 
 ## Verified facts this design rests on
 
@@ -60,20 +61,23 @@ single group of findings in M6.
 
 A second correction came from the same work: the gap register was **undercounting**
 because the adapter's CSS validator stopped at the first bad declaration in a rule
-(DRR-008 §Correction). Every gate below is stated against the corrected baseline
-of **185** `CSS-PROPERTY` findings, not the 65 the earlier record believed.
+(DRR-008 §Correction). A third correction added the shared global stylesheet
+(`src/styles/ui.css`) explicitly, because the adapter never executes Vite's
+`main.ts`. Every gate below is therefore stated against the complete baseline of
+**198** `CSS-PROPERTY` findings, not the 65 the earlier record believed and not
+the 185 component-only baseline.
 
 | Step | Scope | Gate | `CSS-PROPERTY` | Render contract |
 |---|---|---|---|---|
-| **M6a** ✅ | custom properties, `var()`, `color-mix()`; `list-style: none`; `outline: none` | 0 remaining `var()` findings; cycle + fallback + inheritance tests | 185 → **123** | untouched |
-| **M6b** | `border` / `border-<side>` / `background` shorthands | golden PNG changes (dividers and one literal background appear) | 123 → **89** | untouched |
-| **M6c** | `font-weight` | golden PNG changes (real bold), determinism re-verified | 89 → **77** | untouched |
-| **M6d** | `border-radius` | rounded-rect raster determinism; changelog entry for the contract change | 77 → **65** | **extended** |
+| **M6a** ✅ | custom properties, `var()`, `color-mix()`; `list-style: none`; `outline: none` | 0 remaining `var()` findings; cycle + fallback + inheritance tests | 185 → **123** component-only; **198** with global route | untouched |
+| **M6b** | `border` / `border-<side>` / `background` shorthands (59) | golden PNG changes (dividers and literal backgrounds appear) | 198 → **139** | untouched |
+| **M6c** | `font-weight` (24) | golden PNG changes (real bold), determinism re-verified | 139 → **115** | untouched |
+| **M6d** | `border-radius` (18) | rounded-rect raster determinism; changelog entry for the contract change | 115 → **97** | **extended** |
 
-Excluded and reported: `font-variant-numeric` (5) → M11.
+Excluded and reported: `font-variant-numeric` (6 with global route) → M11.
 
-`font-weight` and `border-radius` are `var()`-free in the sample (12 and 12
-findings, zero `var()` uses), which is why they could be built in any order; they
+`font-weight` and `border-radius` have no remaining `var()` findings in the sample
+(24 and 18 findings), which is why they could be built in any order; they
 sit last only because they carry the higher risk.
 
 ### What M6a actually changed beyond `var()`
@@ -88,12 +92,18 @@ sit last only because they carry the higher risk.
 
 ## Decisions
 
-### M6a — shorthands
+> **Heading correction.** The subsection below was written before implementation
+> and labelled "M6a", which was wrong twice over: the *border colour* decision
+> is M6b work (it landed as a prerequisite of M6a because the per-side change was
+> needed to type a M6a test), and the shorthands it describes have not been
+> built. It is now **M6b**. The record's own scope table above is the
+> authoritative step list.
+
+### M6b — shorthands
 
 - **`border-color` becomes a per-side shorthand**, and `ComputedStyle.BorderColor`
-  becomes `[4]uint32` (top, right, bottom, left). This is a prerequisite, not a
-  convenience: the dashboard draws dividers with `border-bottom: 1px solid …`, and
-  a single colour cannot express that.
+  becomes `[4]uint32` (top, right, bottom, left). This landed during M6a as a
+  prerequisite; the rest is still open.
 - **`border-<side>` takes width and colour in any order**, plus the keywords
   `solid` (accepted and ignored — there is exactly one border style) and `none`
   (width 0, colour transparent).

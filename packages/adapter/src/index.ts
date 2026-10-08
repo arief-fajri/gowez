@@ -22,17 +22,19 @@ import { factoryName } from './codegen.js';
 import { MANIFEST_SCHEMA_VERSION, SVELTE_MAJOR, scopeOf, scopesCollide } from './subset.js';
 import { cssSubsetErrors, validateCssSubset } from './css.js';
 import {
+  collectGlobalStyles,
   recordComponentSpecifiers,
   walk,
   type CompiledModule,
   type CssRule,
+  type GlobalStyleSource,
 } from './walk.js';
 import { IdGen } from './ops.js';
 import type { Node } from './typescript.js';
 
 export { CODES, CompileError, Report } from './findings.js';
 export type { Finding, Code, Category } from './findings.js';
-export type { CompiledModule, CssRule } from './walk.js';
+export type { CompiledModule, CssRule, GlobalStyleSource } from './walk.js';
 export { TS_SHAPES } from './typescript.js';
 export {
   ELEMENTS,
@@ -60,6 +62,15 @@ export interface BuildOptions {
   mode?: BuildMode;
   /** Validates component CSS; overridable so tests can inject a stub. */
   validateCss?: typeof validateCssSubset;
+  /**
+   * Raw global stylesheets to validate and place before component CSS.
+   *
+   * This is the runtime's route for a stylesheet such as Vite's `main.ts`
+   * import of `styles/ui.css`: the adapter never executes `main.ts`, so the
+   * caller must name the file explicitly. Its rules are unscoped and form the
+   * base layer that component styles refine.
+   */
+  globalStyles?: ReadonlyArray<GlobalStyleSource>;
 }
 
 export interface BuildResult {
@@ -67,7 +78,7 @@ export interface BuildResult {
   ops: CompiledModule['ops'];
   /** The entry module's root node id. */
   entry: number;
-  /** Collected component CSS rules, in module order. */
+  /** Collected CSS rules: explicit global styles first, then component CSS in module order. */
   css: CssRule[];
   /** Findings, in walk order. Empty in a successful strict build. */
   findings: readonly Finding[];
@@ -99,6 +110,43 @@ export function build(options: BuildOptions): BuildResult {
   const mode = options.mode ?? 'strict';
   const validateCss = options.validateCss ?? validateCssSubset;
   const report = new Report();
+  const validateRule = (
+    rule: { selector: string; declarations: Array<{ property: string; value: string }> },
+    file: string,
+    line: number,
+  ): void => {
+    // Strict mode wants the first failure (it is the actionable one) and
+    // turns it into a CompileError below. Report mode must be *complete*:
+    // it is the gap register the milestone gates are read from, and a
+    // register that stops at the first error in a rule undercounts — it
+    // would hide `grid-template-*` behind an earlier `display: grid` in the
+    // same rule and make the count both wrong and non-monotonic.
+    if (mode === 'strict') {
+      try {
+        validateCss(rule.declarations, file);
+      } catch (err) {
+        report.add({
+          code: cssCodeOf(err),
+          category: 'css',
+          file,
+          line,
+          column: 0,
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return;
+    }
+    for (const message of cssSubsetErrors(rule.declarations, file)) {
+      report.add({
+        code: message.includes('at-rule') ? 'CSS-AT-RULE' : 'CSS-PROPERTY',
+        category: 'css',
+        file,
+        line,
+        column: 0,
+        message,
+      });
+    }
+  };
 
   const graph = resolveGraph(options.rootDir, options.entry, report);
 
@@ -131,6 +179,8 @@ export function build(options: BuildOptions): BuildResult {
     });
   }
 
+  const globalCss = collectGlobalStyles(options.globalStyles ?? [], report, validateRule);
+
   for (const rel of graph.order) {
     const abs = graph.absolute.get(rel);
     if (!abs) continue;
@@ -141,39 +191,7 @@ export function build(options: BuildOptions): BuildResult {
       ids,
       scope: scopeOf(rel),
       componentEntry: (specifier) => componentEntry(resolveSpecifier(displayPath, specifier)),
-      validateCss: (rule, file, line) => {
-        // Strict mode wants the first failure (it is the actionable one) and
-        // turns it into a CompileError below. Report mode must be *complete*:
-        // it is the gap register the milestone gates are read from, and a
-        // register that stops at the first error in a rule undercounts — it
-        // would hide `grid-template-*` behind an earlier `display: grid` in the
-        // same rule and make the count both wrong and non-monotonic.
-        if (mode === 'strict') {
-          try {
-            validateCss(rule.declarations, file);
-          } catch (err) {
-            report.add({
-              code: cssCodeOf(err),
-              category: 'css',
-              file,
-              line,
-              column: 0,
-              message: err instanceof Error ? err.message : String(err),
-            });
-          }
-          return;
-        }
-        for (const message of cssSubsetErrors(rule.declarations, file)) {
-          report.add({
-            code: message.includes('at-rule') ? 'CSS-AT-RULE' : 'CSS-PROPERTY',
-            category: 'css',
-            file,
-            line,
-            column: 0,
-            message,
-          });
-        }
-      },
+      validateCss: validateRule,
     });
     modules.push(compiled);
     entries.set(rel, compiled.entry);
@@ -184,7 +202,7 @@ export function build(options: BuildOptions): BuildResult {
     if (first) throw new CompileError(first);
   }
 
-  const css = modules.flatMap((m) => m.css);
+  const css = [...globalCss, ...modules.flatMap((m) => m.css)];
   const entryModule = modules[modules.length - 1];
   const entry = entryModule?.entry ?? 0;
 
@@ -216,9 +234,9 @@ export function build(options: BuildOptions): BuildResult {
 export function report(
   rootDir: string,
   entry: string,
-  opts: { validateCss?: typeof validateCssSubset } = {},
+  opts: { validateCss?: typeof validateCssSubset; globalStyles?: BuildOptions['globalStyles'] } = {},
 ): BuildResult {
-  return build({ rootDir, entry, mode: 'report', validateCss: opts.validateCss });
+  return build({ rootDir, entry, mode: 'report', validateCss: opts.validateCss, globalStyles: opts.globalStyles });
 }
 
 /**

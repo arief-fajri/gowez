@@ -94,6 +94,26 @@ TypeScript so a build fails before a bundle exists; `css-parity.test.ts` runs th
 **real Go parser** and compares verdict-for-verdict, because a mirror that
 silently disagrees is worse than no mirror.
 
+### Explicit global stylesheets
+
+A caller may supply raw CSS files through `globalStyles`. These files are parsed
+with the same CSS pipeline as component styles, reported with their own project
+paths, left unscoped, and emitted **before** component CSS as the shared base
+layer.
+
+This is the runtime route for Vite's `main.ts` global import: the adapter never
+executes `main.ts`, so it does not discover `./styles/ui.css` on its own. For
+the dashboard register, the command names it explicitly:
+
+```bash
+npm run report:dashboard
+```
+
+Silent omission was the alternative failure mode: without this route, shared
+classes would simply not be inspected and a later mount could look styled while
+missing an entire stylesheet. Global rules do not inherit a component scope, and
+`body` stays a type selector rather than becoming `.body`.
+
 ### Component style scoping
 
 **Each module's `<style>` is scoped to the elements that module renders.** The
@@ -196,6 +216,13 @@ copies the runtime — through the real path (manifest → CSS → sandbox eval 
   graph the subset does not need; for a runtime this size it is the right trade,
   but it is a trade.
 - **`{#key}` is a no-op** (see above).
+- **Lifecycle helpers are approximate, not lifecycle-accurate.** `onMount`,
+  `onDestroy`, and `$effect` all run after every flush, so they are unconditional
+  post-flush hooks; a cleanup function returned from `onMount` is ignored, and
+  `tick()` resolves synchronously. An application such as the dashboard that
+  registers and unregisters a listener would therefore re-register on every state
+  update if the host API existed. Do not rely on these helpers for one-time setup
+  until the host-lifecycle milestone redesigns them.
 
 ## Gap register
 
@@ -211,8 +238,8 @@ npm run report:dashboard -- --json  # the full register
 The sample is out of the subset by design, so this table is the honest statement
 of what a M5 application may not use.
 
-**Current baseline: 197 findings across 7 modules** (123 `CSS-PROPERTY`), re-measured
-2026-10-08 after the register was corrected — see below. This number is
+**Current baseline: 276 findings across 8 scanned stylesheets and modules** (198 `CSS-PROPERTY`), re-measured
+2026-10-08 after the shared global stylesheet was included explicitly — see below. This number is
 why it is a script rather than prose: it is the candidate acceptance metric for
 the follow-on milestones, proposed in
 [DRR-008](../evidence/records/2026-10-08_dashboard-target.md) (confirmed 2026-10-08). Note what it does **not** measure — it counts *rejections*, so a
@@ -231,13 +258,14 @@ scoping was such a defect; see §Component style scoping).
   | `SVELTE-AWAIT` | 0 | svelte | `{#await}` — no promise exists |
   | `SVELTE-RAW-HTML` | 0 | svelte | `{@html}` |
   | `SVELTE-RUNE` | 0 | svelte | any rune outside `$state` `$derived` `$effect` `$props` |
-  | `SVELTE-IMPORT` | 6 | svelte | bare modules, non-`.svelte` relative imports, unresolved components |
+  | `SVELTE-UNSUPPORTED-EXPRESSION` | 5 | svelte | a JS expression the adapter does not model (`ChainExpression`, `SpreadElement`, `NewExpression`) |
+| `SVELTE-IMPORT` | 0 | svelte | bare modules, non-`.svelte` relative imports, unresolved components |
   | `SVELTE-UNSUPPORTED-NODE` | 2 | svelte | a node type outside the subset; also an event outside the event table |
   | `DOM-GLOBAL` | 29 | dom | `document` `window` `location` `history` `navigator` `setTimeout` `setInterval` `fetch` `console` `process` and the DOM constructor set |
   | `DOM-API`, `DOM-FUNCTION` | 0 | dom | a call to one of the above |
-  | `CSS-PROPERTY` | 123 | css | a property or value outside the CSS subset — grid, `overflow-*`, `border-radius`, `box-shadow`, `transition`, `position`, `z-index`, percentage heights. `var()` and `color-mix()` are **supported** since M6a |
-|`CSS-AT-RULE` | 2 | css | `@media`, `@supports`, `@keyframes` — the subset has none |
-|`CSS-SELECTOR` | 4 | css | a selector outside the subset, named explicitly: an unsupported pseudo-class (`:last-child`, `:nth-child`, …), a pseudo-element (`::placeholder`), or a combinator other than descendant (`>`, `+`, `~`) |
+  | `CSS-PROPERTY` | 198 | css | a property or value outside the CSS subset — grid, `overflow-*`, `border-radius`, `box-shadow`, `transition`, `position`, `z-index`, percentage heights. `var()` and `color-mix()` are **supported** since M6a |
+|`CSS-AT-RULE` | 4 | css | `@media`, `@supports`, `@keyframes` — the subset has none |
+|`CSS-SELECTOR` | 7 | css | a selector outside the subset, named explicitly: an unsupported pseudo-class (`:last-child`, `:nth-child`, …), a pseudo-element (`::placeholder`), a universal selector (`*`), attribute selectors, or a combinator other than descendant (`>`, `+`, `~`) |
 |`CSS-SCOPE-COLLISION` | 0 | css | two modules derive the same style scope, which would merge their styles back together |
 |`CSS-UNKNOWN` | 0 | css | a declaration that could not be validated against the subset |
 

@@ -4,15 +4,15 @@
  *
  * Usage:
  *   gowez-adapter build  --root <dir> --entry <App.svelte> --out <dist>
- *   gowez-adapter report --root <dir> --entry <App.svelte> [--json] [--out <file>]
+ *   gowez-adapter report --root <dir> --entry <App.svelte> [--global-css <file.css> ...] [--json] [--out <file>]
  *
  * `build` is strict: any finding fails with a CompileError and nothing is
  * written. `report` is the gap-register generator: it always exits 0 and prints
  * findings, because its output is data about unsupported constructs rather than
  * a build failure.
  */
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 import { build, CompileError } from './index.js';
 import { buildApp } from './app-build.js';
 import type { Finding } from './findings.js';
@@ -21,6 +21,7 @@ interface Args {
   command: 'build' | 'report';
   root: string;
   entry: string;
+  globalCss: string[];
   out?: string;
   json: boolean;
 }
@@ -34,10 +35,24 @@ function parseArgs(argv: string[]): Args {
     const i = argv.indexOf(`--${name}`);
     return i >= 0 ? argv[i + 1] : undefined;
   };
+  const getAll = (name: string): string[] => {
+    const values: string[] = [];
+    argv.forEach((arg, index) => {
+      if (arg === `--${name}` && index + 1 < argv.length) {
+        const value = argv[index + 1];
+        // An option consumes the next token as its value; an omitted value is a
+        // usage error rather than a silent empty path.
+        if (value === undefined) fail(`--${name} needs a value`);
+        values.push(value);
+      }
+    });
+    return values;
+  };
   const args: Args = {
     command,
     root: get('root') ?? process.cwd(),
     entry: get('entry') ?? 'src/App.svelte',
+    globalCss: getAll('global-css'),
     out: get('out'),
     json: argv.includes('--json'),
   };
@@ -54,11 +69,22 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
   try {
+    const rootDir = resolve(args.root);
+    const globalStyles = args.globalCss.map((path) => {
+      const abs = resolve(rootDir, path);
+      const file = relative(rootDir, abs).split(sep).join('/');
+      if (file === '' || file === '..' || file.startsWith('../')) {
+        fail(`--global-css must name a file inside --root (got ${path})`);
+      }
+      return { file, source: readFileSync(abs, 'utf8') };
+    });
+
     if (args.command === 'report') {
       const result = build({
-        rootDir: resolve(args.root),
+        rootDir,
         entry: args.entry,
         mode: 'report',
+        globalStyles,
       });
       emitReport(result.findings, args);
       return;
@@ -66,9 +92,10 @@ async function main(): Promise<void> {
 
     if (!args.out) fail('build requires --out <dist>');
     const written = await buildApp({
-      rootDir: resolve(args.root),
+      rootDir,
       entry: args.entry,
       outDir: resolve(args.out),
+      globalStyles,
     });
     process.stdout.write(
       `gowez-adapter: wrote ${written.ops} ops to ${args.out}\n`,

@@ -14,7 +14,7 @@ Every Level B decision (see [AGENTS.md](../../AGENTS.md) → Decision authority)
 | [2026-10-07_m5-ui-bundle-config.md](2026-10-07_m5-ui-bundle-config.md) | M5 bundle loading: `Config.UI fs.FS` + bundle layout (DRR-006) | ✅ confirmed |
 | [2026-10-07_m5-compile-strategy.md](2026-10-07_m5-compile-strategy.md) | M5 compile strategy: own subset compiler (DRR-007) | ✅ confirmed |
 | [2026-10-08_dashboard-target.md](2026-10-08_dashboard-target.md) | `examples/dashboard` becomes the target app; M6–M11 gap-closing program (DRR-008) | ✅ confirmed 2026-10-08 |
-| [2026-10-08_m6-paint-and-value.md](2026-10-08_m6-paint-and-value.md) | M6 design note: paint & value, cut into M6a–M6d with a gate each | agreed, M6a in progress |
+| [2026-10-08_m6-paint-and-value.md](2026-10-08_m6-paint-and-value.md) | M6 design note: paint & value, cut into M6a–M6d with a gate each | agreed; M6a complete, M6b next |
 
 File naming: `YYYY-MM-DD_<slug>.md`.
 

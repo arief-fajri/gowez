@@ -1,4 +1,4 @@
-# CSS Subset (Milestones 2–3)
+# CSS Subset (Milestones 2–3, extended by M6)
 
 The style layer supports **only** the constructs listed here. Anything else is a
 parse/resolve error with a position — never an ignored declaration and never a
@@ -6,6 +6,14 @@ silent misrender (Module 2 §2.4, G-UPG-04, hard rule 6). The renderer never
 receives styles; it receives commands derived from computed styles and layout.
 
 Owner package: `internal/style`. Consumers: `internal/layout`, `internal/paint`.
+
+The subset grows by milestone. What is here today: the M2/M3 core plus **M6a**
+(custom properties, `var()`, `color-mix(in srgb, …)`, `list-style: none`,
+`outline: none`, per-side border colour). The paint-and-value shorthands, then
+`font-weight`, then `border-radius` are M6b–M6d and are **not** yet accepted.
+The roadmap is [DRR-008](../evidence/records/2026-10-08_dashboard-target.md); what
+an application may not use *today* is enumerated by the gap register
+([SVELTE.md §Gap register](SVELTE.md#gap-register)), not by this document.
 
 ## Selectors
 

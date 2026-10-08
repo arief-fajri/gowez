@@ -88,7 +88,7 @@ Your autonomy is bounded:
 go build ./...          # framework compiles (pure-Go deps only, no cgo)
 ```
 
-Runnable acceptance samples: `go run ./cmd/gowez-hello` (Milestones 1–4) and `go run ./examples/gowez-dashboard` (Milestone 5: a Svelte-authored UI compiled by the adapter and mounted by the runtime — rebuild its bundle with `npm run build -w @gowez/example-gowez-dashboard`). Packaging-grade entrypoints arrive with Milestone 7. The public surface is the root `gowez` package only.
+Runnable acceptance samples: `go run ./cmd/gowez-hello` (Milestones 1–4) and `go run ./examples/gowez-dashboard` (Milestone 5: a Svelte-authored UI compiled by the adapter and mounted by the runtime — rebuild its bundle with `npm run build:sample`). Packaging-grade entrypoints arrive after the rendering program (DRR-008). The public surface is the root `gowez` package only.
 
 ## Test
 
@@ -136,8 +136,8 @@ go vet ./...            # must be clean
 - `internal/observe` — metrics + diagnostics (Module 5)
 - `protocol/` — versioned JSON Schemas shared by Go and TypeScript
 - `packages/adapter` — Svelte → UI instructions (Strategy B, Milestone 5)
-- `examples/gowez-dashboard` — M5 acceptance slice, compiled into a committed `dist/` and mounted by Go
-- `examples/dashboard` — browser test bed: the full dashboard, deliberately out of the M5 subset
+- `examples/gowez-dashboard` — the **fixture**: the smallest Svelte app that must always compile with zero findings, mounted by Go from a committed `dist/`. It backs the golden, integration and reactivity suites, so it is what makes a regression identifiable rather than merely likely
+- `examples/dashboard` — the **target application** (DRR-008): the full six-page admin app, which must keep running in the browser via Vite and must eventually reach zero gap-register findings in the Go runtime. It shares no code with the fixture; the two have different jobs and coexist deliberately
 - `tests/{golden,integration,failure,bench}` — cross-cutting suites
 - `tests/parity` — exposes `internal/style`'s accept/reject verdicts as data so the adapter's TypeScript CSS mirror can be diffed against the real parser (two implementations of one rule set are a liability unless a test compares them)
 - `evidence/{experiments,records,learnings.md}` — traceable artifacts

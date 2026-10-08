@@ -13,7 +13,7 @@ import {
   keyFixture,
   lifecycleFixture,
 } from './fixtures.js';
-import { build, cssToText } from '../src/index.js';
+import { build, cssToText, report } from '../src/index.js';
 import { INSTRUCTION_VERSION } from '../src/subset.js';
 
 const SUBSET_FIXTURES: Array<[string, string]> = [
@@ -143,6 +143,79 @@ describe('strict build of in-subset fixtures', () => {
     // rooted on its own.
     const roots = result.ops.filter((op) => op.kind === 'createElement' && op.nodeId === result.entry);
     expect(roots).toHaveLength(1);
+  });
+
+  it('resolves components nested inside a {#key} block', () => {
+    const root = project({
+      'src/App.svelte': `<script>
+  import Child from './Nested.svelte';
+  let page = $state('one');
+</script>
+{#key page}
+  <Child />
+{/key}`,
+      'src/Nested.svelte': `<p>child</p>`,
+    });
+    const result = build({ rootDir: root, entry: 'src/App.svelte' });
+
+    // The static walk descends through {#key}; losing the module options there
+    // used to make every nested component look unresolvable.
+    expect(result.findings).toEqual([]);
+    const attachment = result.ops.find(
+      (op) =>
+        op.kind === 'appendChild' &&
+        op.parentId === result.entry &&
+        op.childId !== result.entry,
+    );
+    expect(attachment).toBeDefined();
+  });
+
+  it('reports unmodelled expressions and statements at compile time', () => {
+    const root = project({
+      'src/App.svelte': `<script>
+  let stamp = new Date();
+  while (false) {
+    stamp = new Date();
+  }
+</script>
+<p>{stamp}</p>`,
+    });
+    const result = report(root, 'src/App.svelte');
+    const codes = result.findings.map((finding) => finding.code);
+
+    // The emitted bundle keeps a fail-closed marker, but strict mode must never
+    // reach it: both shapes are compile-time findings.
+    expect(codes).toContain('SVELTE-UNSUPPORTED-EXPRESSION');
+    expect(codes).toContain('SVELTE-UNSUPPORTED-NODE');
+  });
+
+  it('treats explicit global CSS as an unscoped base layer', () => {
+    const root = project({
+      'src/App.svelte': `<p class="other">child</p>
+<style>.other { color: #ffffff; }</style>`,
+    });
+    const result = report(root, 'src/App.svelte', {
+      globalStyles: [
+        {
+          file: 'src/styles/ui.css',
+          source: `body { margin: 0; }
+.base { background-color: #ffffff; }
+* { color: #ffffff; }`,
+        },
+      ],
+    });
+
+    // A caller-supplied global stylesheet is the base layer: its selectors are
+    // printed exactly as written and come before component CSS. It also cannot
+    // suppress its own gaps.
+    expect(result.css.map((rule) => rule.selector)).toEqual([
+      'body',
+      '.base',
+      '.other.s-App',
+    ]);
+    expect(result.findings.map((finding) => finding.code)).toEqual(['CSS-SELECTOR']);
+    expect(result.findings[0]!.file).toBe('src/styles/ui.css');
+    expect(result.findings[0]!.message).toMatch(/universal selector \* is not in the CSS subset/);
   });
 
   it('reuses one instruction version across the manifest and the runtime', () => {

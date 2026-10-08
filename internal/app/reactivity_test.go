@@ -152,6 +152,12 @@ func TestReactivityMountRendersCurrentState(t *testing.T) {
 	if got := textOfClassCount(t, s, "", "button"); got < 3 {
 		t.Errorf("nav buttons = %d, want at least 3", got)
 	}
+	// `class:active` is dynamic, so the first runtime pass must evaluate it.
+	// An empty or literal class on the mounted dashboard button would mean the
+	// mount stream and the emitted runtime disagreed about initial state.
+	if active := firstButtonWithText(t, s, "dashboard"); !active.HasClass("active") {
+		t.Errorf("initial dashboard button class = %q, want it to contain active", active.GetAttribute("class"))
+	}
 
 	if m := rec.Snapshot(); m.UIOpsRejected != 0 {
 		t.Errorf("UIOpsRejected = %d at mount, want 0", m.UIOpsRejected)

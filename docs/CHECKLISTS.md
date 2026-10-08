@@ -121,6 +121,6 @@ The milestone gate is a **finding budget** in the gap register
 - [x] **M6a** `list-style: none` / `outline: none` — accepted because the outcome is already true (nothing paints a marker or an outline), and every other value is refused rather than swallowed ([parity cases](../tests/parity/parity.go))
 - [x] **M6a** per-side border colour — `ComputedStyle.BorderColor` is `[4]uint32`; `border-color` expands to four longhands; `drawBorders` skips a transparent side individually
 - [x] **M6a** the gap register is complete — [cssSubsetErrors](../packages/adapter/src/css.ts) collects every rejection instead of throwing on the first per rule. The baseline was **259**, not the 139 an earlier record published; the count is not monotonic while unmasked findings remain behind the first error in a rule
-- [ ] **M6b** `background` / `border` / `border-<side>` shorthands — gate `CSS-PROPERTY` 123 → 89
-- [ ] **M6c** `font-weight` — gate 89 → 77; golden must change (a real bold face, not faux bold)
-- [ ] **M6d** `border-radius` — gate 77 → 65; **extends the `render.Renderer` contract**, so it needs a G-UPG-03 changelog entry
+- [ ] **M6b** `background` / `border` / `border-<side>` shorthands — gate `CSS-PROPERTY` 198 → 139
+- [ ] **M6c** `font-weight` — gate 139 → 115; golden must change (a real bold face, not faux bold)
+- [ ] **M6d** `border-radius` — gate 115 → 97; **extends the `render.Renderer` contract**, so it needs a G-UPG-03 changelog entry

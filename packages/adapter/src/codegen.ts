@@ -18,6 +18,7 @@
  * - `$props()`        → the factory's `props` argument, with defaults
  */
 import { BINDS, BOOLEAN_ATTRIBUTES, ELEMENTS, EVENTS, FOCUSABLE, scopeOf } from './subset.js';
+import { CODES, type Report } from './findings.js';
 import type { Node } from './typescript.js';
 
 /** GenContext is the state one module's generation walks with. */
@@ -40,6 +41,10 @@ export interface GenContext {
    * module's CSS selectors — one source of truth for both sides.
    */
   styleScope: string;
+  /** Report for constructs the code generator cannot represent. */
+  report: Report;
+  /** Project-relative module path used in findings. */
+  file: string;
 }
 
 /** GenResult is one generated module. */
@@ -84,6 +89,7 @@ export function generateFactory(
   instance: Node | null,
   fragment: Node,
   components: Map<string, string>,
+  meta: { report: Report },
 ): GenResult {
   const ctx: GenContext = {
     declared: new Set(),
@@ -93,6 +99,8 @@ export function generateFactory(
     derived: new Set<string>(),
     scope: new Set<string>(),
     styleScope: scopeOf(file),
+    report: meta.report,
+    file,
   };
 
   const body: string[] = [];
@@ -344,10 +352,16 @@ function statement(node: Node, ctx: GenContext): string {
     case 'ForOfStatement':
     case 'ForStatement':
     case 'WhileStatement':
-      return printGeneric(node);
+      return unsupportedStatement(node, ctx);
     default:
-      return printGeneric(node);
+      return unsupportedStatement(node, ctx);
   }
+}
+
+/** unsupportedStatement records an unmodelled statement before emitting a fail-closed marker. */
+function unsupportedStatement(node: Node, ctx: GenContext): string {
+  reportUnsupported('SVELTE-UNSUPPORTED-NODE', node, ctx, `statement ${node.type} is outside the compiled subset`);
+  return `__unsupported_statement(${JSON.stringify(node.type)})`;
 }
 
 /** runtimeCall maps a lifecycle helper onto the emitted runtime's name. */
@@ -798,8 +812,30 @@ export function expression(node: Node, ctx: GenContext): string {
     }
 
     default:
-      return `__unsupported_expression(${JSON.stringify(node.type)})`;
+      return unsupportedExpression(node, ctx);
   }
+}
+
+/** unsupportedExpression records an unmodelled expression before emitting a fail-closed marker. */
+function unsupportedExpression(node: Node, ctx: GenContext): string {
+  reportUnsupported('SVELTE-UNSUPPORTED-EXPRESSION', node, ctx, `expression ${node.type} is outside the compiled subset`);
+  return `__unsupported_expression(${JSON.stringify(node.type)})`;
+}
+
+function reportUnsupported(
+  code: 'SVELTE-UNSUPPORTED-EXPRESSION' | 'SVELTE-UNSUPPORTED-NODE',
+  node: Node,
+  ctx: GenContext,
+  message: string,
+): void {
+  ctx.report.add({
+    code,
+    category: CODES[code].category,
+    file: ctx.file,
+    line: node.loc?.start.line ?? 0,
+    column: node.loc?.start.column ?? 0,
+    message,
+  });
 }
 
 /**
@@ -863,11 +899,6 @@ function children(node: Node): Node[] {
   const list =
     (node as { nodes?: Node[] }).nodes ?? (node as { children?: Node[] }).children;
   return Array.isArray(list) ? list : [];
-}
-
-/** printGeneric renders a node the subset does not model, as an explicit call. */
-function printGeneric(node: Node): string {
-  return `__unsupported_statement(${JSON.stringify(node.type)})`;
 }
 
 /** ELEMENTS is re-exported so the walk can share one source of truth. */
