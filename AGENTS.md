@@ -88,7 +88,7 @@ Your autonomy is bounded:
 go build ./...          # framework compiles (pure-Go deps only, no cgo)
 ```
 
-Runnable acceptance sample: `go run ./cmd/gowez-hello` (Milestone 1 complete 2026-10-03; Milestone 2 UI scene 2026-10-05; Milestone 3 input/interaction 2026-10-06; Milestone 4 JS engine/IPC 2026-10-07). Packaging-grade entrypoints arrive with Milestone 7. The public surface is the root `gowez` package only.
+Runnable acceptance samples: `go run ./cmd/gowez-hello` (Milestones 1–4) and `go run ./examples/gowez-dashboard` (Milestone 5: a Svelte-authored UI compiled by the adapter and mounted by the runtime — rebuild its bundle with `npm run build -w @gowez/example-gowez-dashboard`). Packaging-grade entrypoints arrive with Milestone 7. The public surface is the root `gowez` package only.
 
 ## Test
 
@@ -136,8 +136,10 @@ go vet ./...            # must be clean
 - `internal/observe` — metrics + diagnostics (Module 5)
 - `protocol/` — versioned JSON Schemas shared by Go and TypeScript
 - `packages/adapter` — Svelte → UI instructions (Strategy B, Milestone 5)
-- `examples/dashboard` — acceptance sample, runnable in the browser (Milestone 5)
+- `examples/gowez-dashboard` — M5 acceptance slice, compiled into a committed `dist/` and mounted by Go
+- `examples/dashboard` — browser test bed: the full dashboard, deliberately out of the M5 subset
 - `tests/{golden,integration,failure,bench}` — cross-cutting suites
+- `tests/parity` — exposes `internal/style`'s accept/reject verdicts as data so the adapter's TypeScript CSS mirror can be diffed against the real parser (two implementations of one rule set are a liability unless a test compares them)
 - `evidence/{experiments,records,learnings.md}` — traceable artifacts
 
 ## Hard rules

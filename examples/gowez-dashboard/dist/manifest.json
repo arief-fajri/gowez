@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "adapter": {
+    "name": "gowez-adapter",
+    "version": "1.0.0"
+  },
+  "svelte": 5,
+  "script": "app.js",
+  "styles": "styles.css"
+}

@@ -15,7 +15,7 @@ A checklist item passes only with a test, an experiment record, or a documented 
 
 - [x] Application starts from a clean environment — [startup sequence test](../tests/integration/window_test.go), [experiment A](../evidence/experiments/2026-10-03_a_renderer-init-failure.md)
 - [x] Native window opens — [tests/integration/window_test.go](../tests/integration/window_test.go)
-- [ ] Svelte UI loads
+- [x] Svelte UI loads — [`TestGowezDashboardMounts`](../tests/golden/bundle_test.go), [`TestBundleMountsFixture`](../internal/app/bundle_test.go), [`TestDashboardWindowMounts`](../tests/integration/dashboard_test.go) (the same bundle, mounted into a **real OS window**); committed `examples/gowez-dashboard/dist` mounts through the real path (manifest → CSS → sandbox eval → `ui.apply` → layout). Operator visual check: [DEVELOPMENT_GUIDE §Manual window check](../DEVELOPMENT_GUIDE.md#manual-window-check)
 - [x] Text renders — [golden text.png](../tests/golden/testdata/text.png)
 - [x] Basic shapes render — [golden rects.png](../tests/golden/testdata/rects.png)
 - [x] Button renders — [golden ui.png](../tests/golden/testdata/ui.png) ("Apply" button in the M2 scene), [uiscene.go](../internal/app/uiscene.go)
@@ -27,14 +27,31 @@ A checklist item passes only with a test, an experiment record, or a documented 
 
 ## Svelte integration (M5)
 
-- [ ] Svelte component can be compiled
-- [ ] Component state can update
-- [ ] Event handler works
-- [ ] Conditional rendering works
-- [ ] List rendering works
-- [ ] Basic component composition works
-- [ ] Required browser APIs are documented
-- [ ] Unsupported Svelte/browser behavior is explicit
+**M5 gate closed 2026-10-07, window proof added 2026-10-08, style scoping added
+2026-10-08.** Pipeline, applier, bundle loader, text input, reactivity and
+component style scoping are implemented and tested. Reactivity is a full
+re-render per state change, diffed against the previous node tree by node id
+([SVELTE.md §Reactivity model](SVELTE.md#reactivity-model)).
+
+> **Scope note — layout fidelity is *not* an M5 criterion.** The M5 subset has no
+> inline flow, no percentage heights, no margin collapsing and no CSS Grid, so a
+> real-world application does not yet render faithfully. The golden PNG locks the
+> *pipeline* (Svelte → adapter → bundle → sandbox → `ui.apply` → style → layout →
+> paint → pixels), not the visual result; regenerating it as capabilities land is
+> an improvement. What an application may not use is enumerated by the gap
+> register, and closing that gap register is the scope **proposed** in
+> [DRR-008](../evidence/records/2026-10-08_dashboard-target.md) (still open — the
+> M6–M10 sequence is not yet approved).
+
+- [x] Svelte component can be compiled — [`TestCompile`](../packages/adapter/test/compile.test.ts) (six in-subset fixtures, strict, zero findings), [`TestGowezDashboardMounts`](../tests/golden/bundle_test.go) (the committed bundle mounts, styles, lays out)
+- [x] Component styles are scoped to their component — [`scoping.test.ts`](../packages/adapter/test/scoping.test.ts) (10 tests: scope on every selector, on every element, per-module isolation, collision detection, combinator printing), [`TestBundleStylesAreScoped`](../tests/golden/bundle_test.go) (end-to-end through `internal/style`: each `<button>` resolves the padding declared by *its own* module — the leak that 8 dashboard selectors had)
+- [x] Component state can update — [`TestReactivityStateChangeUpdatesUI`](../internal/app/reactivity_test.go) (click → `$state` write → re-render → diff reaches the tree), [`TestReactivityRepeatClicksStayBounded`](same) (five clicks: no duplicated nodes, one batch each)
+- [x] Event handler works — [`TestBundleClickIncrementsCount`](../internal/app/bundle_test.go), [`TestLoopDispatchesInput`](../internal/app/input_test.go)
+- [x] Conditional rendering works — [`TestReactivityMountRendersCurrentState`](../internal/app/reactivity_test.go) (exactly one `{#if}` arm at mount), same test after a click (the arm flips)
+- [x] List rendering works — [`TestReactivityMountRendersCurrentState`](../internal/app/reactivity_test.go) (one node per item), [`TestReactivityListUpdateRemovesOnlyOne`](same) (keyed: removing one row of three emits a bounded diff), [`TestReactivityFilteredListReactsToInput`](same) (typing filters the list)
+- [x] Basic component composition works — [`TestCompile` "compiles a child module before its importer"](../packages/adapter/test/compile.test.ts); `<Child {items} onRemove={…} />` inlines one tree root ([golden](../tests/golden/testdata/gowez-dashboard.png))
+- [x] Required browser APIs are documented — [SVELTE.md](SVELTE.md) §Gap register, generated from adapter `report` mode and asserted by [`gap-report.test.ts`](../packages/adapter/test/gap-report.test.ts)
+- [x] Unsupported Svelte/browser behavior is explicit — [`reject.test.ts`](../packages/adapter/test/reject.test.ts) (one test per forbidden construct), [`gap-report.test.ts`](../packages/adapter/test/gap-report.test.ts) (dashboard scan), closed code catalog in [`findings.ts`](../packages/adapter/src/findings.ts)
 
 ## IPC (M4/M6)
 
@@ -64,30 +81,30 @@ A checklist item passes only with a test, an experiment record, or a documented 
 
 ## Release (M7)
 
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] Svelte integration tests pass
-- [ ] Renderer tests pass
-- [ ] IPC tests pass
-- [ ] Failure experiments pass
+- [x] Unit tests pass — `go test ./... -count=1` green (2026-10-08)
+- [x] Integration tests pass — `go test -tags integration ./tests/integration/` green: [`TestWindowLifecycle`](../tests/integration/window_test.go) (raw SDL backend) + [`TestDashboardWindowMounts`](../tests/integration/dashboard_test.go) (the compiled Svelte bundle mounted into a real OS window, 3 frames presented, no rejected batches) (2026-10-08)
+- [x] Svelte integration tests pass — 125 adapter tests (`packages/adapter/test`) plus the Go bundle, reactivity, text-input and golden suites; full battery green (`npm test`, `npm run typecheck`, `go build`, `gofmt`, `go vet`, `go test ./... -count=1`, `-race`, `go test -tags integration`)
+- [x] Renderer tests pass — `internal/render/backend/software` + [goldens](../tests/golden) byte-exact (2026-10-08)
+- [x] IPC tests pass — [dispatcher tests](../internal/ipc/dispatcher_test.go) (2026-10-08)
+- [ ] Failure experiments pass — A–C executed with records; D (native) and E (resource) are M6 / M5+ and still pending
 - [ ] Basic benchmark exists
-- [ ] Documentation updated
+- [x] Documentation updated — [SVELTE.md](SVELTE.md), [SCRIPT.md](SCRIPT.md), [EVENTS.md](EVENTS.md), [CSS-SUBSET.md](CSS-SUBSET.md), [CHECKLISTS.md](CHECKLISTS.md), [GUARDRAILS.md](GUARDRAILS.md) changelog, README/AGENTS/DEVELOPMENT_GUIDE (2026-10-08)
 
 ## MVP definition of done
 
 The MVP counts as complete for **technical validation** when:
 
-- [ ] A Svelte application builds successfully
+- [x] A Svelte application builds successfully — [`buildFixture` strict tests](../packages/adapter/test/compile.test.ts) (six in-subset fixtures, zero findings) and `npm run build -w @gowez/example-gowez-dashboard` → [dist/](../examples/gowez-dashboard/dist) (committed, 102 ops)
 - [x] No Chromium dependency — [go.mod](../go.mod) carries pure-Go deps only; `CGO_ENABLED=0 go build ./...` passes
 - [x] No OS WebView dependency — windowing via purego SDL3, [DRR-001](../evidence/records/2026-10-03_windowing-purego-sdl3.md)
 - [x] The Go binary can create a native window — `cmd/gowez-hello`, [integration test](../tests/integration/window_test.go)
 - [ ] Basic UI renders through the GPU
 - [x] The user can interact with the UI — click/keyboard/state via [input_test.go](../internal/app/input_test.go) + [EVENTS.md](EVENTS.md) semantics; interactive scene in [uiscene.go](../internal/app/uiscene.go)
-- [ ] Svelte state produces UI updates
+- [x] Svelte state produces UI updates — [`reactivity_test.go`](../internal/app/reactivity_test.go) against the committed bundle, driving the real path end to end
 - [x] JS can call explicit Go APIs — [experiment C](../evidence/experiments/2026-10-07_c_unknown-method.md) (JS path asserts `e.code`), [TestInvokeSuccessReturnsResult](../internal/script/bindings_test.go), [TestSceneJSDrivesStateThroughIPC](../internal/app/input_test.go)
 - [ ] Go APIs can access at least one native capability
 - [ ] Main failure modes can be tested
 - [ ] Startup/memory/rendering benchmarks exist
-- [ ] Browser/Svelte compatibility limits are documented
+- [x] Browser/Svelte compatibility limits are documented — [SVELTE.md](SVELTE.md) §Gap register (generated, test-asserted), §Divergences, §Svelte compatibility; [CSS-SUBSET.md](CSS-SUBSET.md) for the CSS half
 
 Reaching these does **not** mean the framework is production-ready — it only proves the architectural hypothesis is worth continuing.

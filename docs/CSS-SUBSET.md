@@ -31,6 +31,18 @@ A compound selector is `type?` followed by any `.class` / `#id` /
 …), pseudo-elements (`::before`), `@`-rules (`@media`, `@import`),
 `!important`.
 
+### Scoped selectors
+
+The adapter rewrites each component's selectors before they reach this parser:
+it appends one scope class to the **subject** compound of every selector
+(`.row` → `.row.s-App`, `.row:hover` → `.row.s-App:hover`). That is why the
+compound grammar above must accept several classes — see
+[SVELTE.md §Component style scoping](SVELTE.md#component-style-scoping).
+
+`internal/style` itself has no notion of scoping: it matches exactly what it is
+given. A stylesheet built by hand is unscoped, and a class attribute is a
+token list — compare tokens (see `ui.Node.HasClass`), never the whole string.
+
 ## Properties
 
 Units: `px` and `%` (see per-property notes) and the keyword `auto`.
@@ -108,6 +120,17 @@ These are deliberate (G-UPG-04) and must stay in sync with the implementation:
 - **Only three pseudo-classes exist** (`:hover`, `:active`, `:focus`);
   state bits come from input ([EVENTS.md](EVENTS.md)), there is no focus
   ring (`outline` does not exist) and no cursor/`pointer` property.
+- **No structural pseudo-classes.** `:last-child`, `:nth-child()` and friends
+  need a document-order pass the matcher does not have; they are rejected rather
+  than approximated. The adapter reports each one by name (`CSS-SELECTOR`), so a
+  dropped rule reads as "not supported yet", not "adapter bug".
+- **The subset is sized to a slice, not to an application.** A visual triage of
+  the M5 slice against `examples/dashboard` measured **139 adapter findings**
+  across 7 modules — no grid, no `border-radius`, no shorthands, no custom
+  properties, no `line-height`, no `overflow`. What an application may not use
+  today is enumerated in [SVELTE.md §Gap register](SVELTE.md#gap-register), and
+  the proposal to close it is [DRR-008](../evidence/records/2026-10-08_dashboard-target.md)
+  (**open, not yet approved**).
 
 ## Error contract
 

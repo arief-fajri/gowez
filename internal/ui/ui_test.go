@@ -24,6 +24,57 @@ func TestAttributes(t *testing.T) {
 
 // TestGeometrySnapshot replaces the whole map at once; a hit test never
 // sees a mix of old and new boxes (invariant I1).
+func TestHasClass(t *testing.T) {
+	t.Parallel()
+	n := &Node{ID: 1}
+
+	// An empty or absent class attribute contains no token.
+	if n.HasClass("card") {
+		t.Fatal("HasClass matched on a node with no class attribute")
+	}
+	// The empty token must never match: it would otherwise match every node.
+	if n.HasClass("") {
+		t.Fatal("HasClass(\"\") matched; the empty token must never match")
+	}
+
+	n.SetAttribute("class", "card primary")
+	if !n.HasClass("card") {
+		t.Error("HasClass(card) = false, want true")
+	}
+	if !n.HasClass("primary") {
+		t.Error("HasClass(primary) = false, want true")
+	}
+	// A class must match a whole token, not a prefix or a substring.
+	if n.HasClass("car") {
+		t.Error("HasClass(car) matched the prefix of card")
+	}
+	if n.HasClass("primary-extra") {
+		t.Error("HasClass(primary-extra) matched a superstring of primary")
+	}
+	if n.HasClass("missing") {
+		t.Error("HasClass(missing) = true, want false")
+	}
+
+	// The scoped form the adapter emits: the scope is an added token, not a
+	// replacement, so an author's class must still match.
+	n.SetAttribute("class", "card s-App")
+	if !n.HasClass("card") {
+		t.Error("HasClass(card) = false after scoping appended s-App")
+	}
+	if !n.HasClass("s-App") {
+		t.Error("HasClass(s-App) = false, want true")
+	}
+	if n.HasClass("card s-App") {
+		t.Error("HasClass matched the whole attribute value as one token")
+	}
+
+	// Extra whitespace is a separator, not part of a token.
+	n.SetAttribute("class", "  card   s-App ")
+	if !n.HasClass("card") || !n.HasClass("s-App") {
+		t.Error("HasClass did not tolerate surrounding/duplicated whitespace")
+	}
+}
+
 func TestGeometrySnapshot(t *testing.T) {
 	t.Parallel()
 	tree := NewTree()

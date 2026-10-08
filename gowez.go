@@ -12,7 +12,11 @@
 // DEVELOPMENT_GUIDE.md for the roadmap.
 package gowez
 
-import "github.com/arief-fajri/gowez/internal/app"
+import (
+	"io/fs"
+
+	"github.com/arief-fajri/gowez/internal/app"
+)
 
 // ErrNotImplemented is returned by entry points whose milestone has not
 // landed yet. It disappears milestone by milestone (see DEVELOPMENT_GUIDE.md).
@@ -27,6 +31,22 @@ type Config struct {
 	// Width and Height are the initial window dimensions in logical pixels.
 	Width  int
 	Height int
+	// UI is the compiled Svelte bundle to mount, or nil to run the built-in
+	// demo scene.
+	//
+	// The bundle is the output of @gowez/adapter and has a fixed layout:
+	//
+	//	manifest.json  {schemaVersion, adapter, svelte, script, styles}
+	//	app.js         single-file IIFE: mount + effects + handlers
+	//	styles.css     component CSS, validated against docs/CSS-SUBSET.md
+	//
+	// In development pass os.DirFS("dist"); packaging uses //go:embed
+	// (Milestone 7). Every bundle file is required — a missing file is an
+	// explicit startup failure, never a silently empty UI (P4).
+	//
+	// Adding UI is additive: a nil UI keeps the M1–M4 demo scene exactly as
+	// it was. Decision: DRR-006.
+	UI fs.FS
 }
 
 // App is a handle to a running application instance. Methods arrive with
@@ -47,5 +67,6 @@ func Run(cfg Config) error {
 		Title:  cfg.Title,
 		Width:  cfg.Width,
 		Height: cfg.Height,
+		UI:     cfg.UI,
 	})
 }

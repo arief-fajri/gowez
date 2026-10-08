@@ -8,8 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/arief-fajri/gowez/internal/ipc"
 	"github.com/arief-fajri/gowez/internal/observe"
 	"github.com/arief-fajri/gowez/internal/render/backend/software"
+	"github.com/arief-fajri/gowez/internal/script"
 	"github.com/arief-fajri/gowez/internal/text"
 	"github.com/arief-fajri/gowez/internal/ui"
 	"github.com/arief-fajri/gowez/internal/window"
@@ -103,14 +105,14 @@ func (a *App) execute(start time.Time) error {
 	}
 	defer eng.Close()
 
-	scene, err := newUIScene(a.metrics, eng, disp)
+	// UI tree. Two paths, one shape (PLATFORM startup: JS runtime → UI bundle
+	// → UI tree): a Config.UI bundle is mounted here, otherwise the built-in
+	// demo scene is built as before. The nil case is byte-for-byte the M1–M4
+	// behavior (DRR-006, additive API).
+	sc, err := a.newScene(disp, eng)
 	if err != nil {
-		return a.fail("scene", "scene initialization failed", err)
+		return err
 	}
-	if err := scene.bindScript(); err != nil {
-		return a.fail("script", "scene script failed to load", err)
-	}
-	a.wireScenePanic(scene)
 
 	if err := a.transition(StateReady); err != nil {
 		return err
@@ -119,18 +121,41 @@ func (a *App) execute(start time.Time) error {
 	a.metrics.RecordStartup(ready.Sub(start))
 	win.Show()
 
-	if err := a.loop(win, rend, scene, ready); err != nil {
+	if err := a.loop(win, rend, sc, ready); err != nil {
 		return err
 	}
 	return a.transition(StateStopping)
 }
 
-// wireScenePanic connects the scene's handler-panic hook to the
-// reporter: a panicking UI handler is recovered by dispatch and
-// surfaced as a diagnostic while the frame loop keeps running
-// (docs/EVENTS.md §handler contract).
-func (a *App) wireScenePanic(scene *uiScene) {
-	scene.tree.OnPanic = func(e *ui.Event, recovered any) {
+// newScene mounts the UI: the bundle when Config.UI is set, otherwise the
+// demo scene. Each failure is reported under its own component so a broken
+// bundle never looks like a working demo UI.
+func (a *App) newScene(disp *ipc.Dispatcher, eng script.Engine) (scene, error) {
+	if a.opts.UI != nil {
+		s, err := newBundleScene(a.opts.UI, a.metrics, a.reporter, eng, disp)
+		if err != nil {
+			return nil, a.fail("bundle", "UI bundle failed to load", err)
+		}
+		a.wireTreePanic(s.tree)
+		return s, nil
+	}
+
+	s, err := newUIScene(a.metrics, eng, disp)
+	if err != nil {
+		return nil, a.fail("scene", "scene initialization failed", err)
+	}
+	if err := s.bindScript(); err != nil {
+		return nil, a.fail("script", "scene script failed to load", err)
+	}
+	a.wireTreePanic(s.tree)
+	return s, nil
+}
+
+// wireTreePanic connects the tree's handler-panic hook to the reporter: a
+// panicking UI handler is recovered by dispatch and surfaced as a diagnostic
+// while the frame loop keeps running (docs/EVENTS.md §handler contract).
+func (a *App) wireTreePanic(tree *ui.Tree) {
+	tree.OnPanic = func(e *ui.Event, recovered any) {
 		a.reporter.Report(observe.Diagnostic{
 			Component: "ui",
 			Message:   fmt.Sprintf("recovered panic in %s handler", e.Kind),
@@ -145,12 +170,39 @@ func (a *App) wireScenePanic(scene *uiScene) {
 // ignored, so the runtime installs its own handler — otherwise the
 // process can only be killed with SIGKILL). It aborts with a reported
 // diagnostic on any present failure.
-func (a *App) loop(win window.Window, rend *software.Renderer, scene *uiScene, from time.Time) error {
+func (a *App) loop(win window.Window, rend *software.Renderer, sc scene, from time.Time) error {
 	// Buffered so a signal arriving mid-frame is never lost; signal.Stop
 	// on return restores default handling.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
+
+	// Platform text input follows focus (Milestone 5): the platform only
+	// emits text events while it is active, so it is started when an
+	// editable node gains focus and stopped when it loses it. A failure is
+	// reported rather than silently leaving text undeliverable.
+	textActive := false
+	defer func() {
+		if textActive {
+			_ = win.StopTextInput()
+		}
+	}()
+	setTextInput := func(want bool) error {
+		if want == textActive {
+			return nil
+		}
+		var err error
+		if want {
+			err = win.StartTextInput()
+		} else {
+			err = win.StopTextInput()
+		}
+		if err != nil {
+			return a.fail("input", "platform text input toggle failed", err)
+		}
+		textActive = want
+		return nil
+	}
 
 	next := from.Add(frameBudget)
 	for {
@@ -176,10 +228,11 @@ func (a *App) loop(win window.Window, rend *software.Renderer, scene *uiScene, f
 			switch ev.(type) {
 			case window.CloseEvent:
 				running = false
-			case window.PointerEvent, window.KeyEvent:
+			case window.PointerEvent, window.KeyEvent,
+				window.TextInputEvent, window.TextEditingEvent:
 				// Fed before drawing so a state change paints in the
 				// same frame (pump → dispatch → draw).
-				scene.handleInput(ev)
+				sc.HandleInput(ev)
 			case window.ResizeEvent:
 				// No action: win.Size() is re-read below every frame
 				// and drives relayout directly.
@@ -187,6 +240,9 @@ func (a *App) loop(win window.Window, rend *software.Renderer, scene *uiScene, f
 		}
 		if !running {
 			return nil
+		}
+		if err := setTextInput(sc.FocusEditable()); err != nil {
+			return err
 		}
 
 		logicalW, logicalH := win.Size()
@@ -196,7 +252,7 @@ func (a *App) loop(win window.Window, rend *software.Renderer, scene *uiScene, f
 		}
 
 		rend.BeginFrame(pw, ph)
-		if err := scene.Draw(rend, pw, ph, logicalW, logicalH); err != nil {
+		if err := sc.Draw(rend, pw, ph, logicalW, logicalH); err != nil {
 			return a.fail("scene", "scene draw failed", err)
 		}
 		rend.EndFrame()
@@ -207,7 +263,7 @@ func (a *App) loop(win window.Window, rend *software.Renderer, scene *uiScene, f
 		if err := win.Present(px, pw, ph); err != nil {
 			return a.fail("window", "present failed", err)
 		}
-		scene.Tick()
+		sc.Tick()
 
 		a.metrics.RecordFrame(time.Since(frameStart) > maxFrameOverrun)
 	}

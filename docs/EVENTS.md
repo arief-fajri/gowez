@@ -160,3 +160,49 @@ repeat arrives as repeated `KeyDown` with no matching extra `KeyUp`.
   needs a scroll container (absent from the subset); text input/IME is
   deferred to Milestone 5 (decision 2026-10-07 — M4 covered the JS
   engine and IPC, not text entry).
+
+## Text input and IME (Milestone 5)
+
+Two additive event kinds carry text. They are the only events whose payload is
+text — every other kind is geometry or a key name.
+
+| Kind | Produced by | Target | Payload |
+|---|---|---|---|
+| `textinput` | the platform text-input source, active only while `StartTextInput` is in effect | the focused node | `Text` — committed text |
+| `textediting` | the platform IME | the focused node | `Text`, `TextStart`, `TextLength` — preedit plus the composition extent |
+
+Rules:
+
+- **The target is focus, not hit testing.** A pointer over an unrelated element
+  must not redirect typing into it, so `Tree.TextInput`/`Tree.TextEditing`
+  dispatch to the focused node and are separate entry points from
+  `PointerDown`. With nothing focused the event is unhandled, not an error (I6).
+- **Characters never come from layout.** There is no keycode→character table;
+  the platform hands over text, which is the only way composition and
+  non-Latin input work at all.
+- **Preedit is never committed.** `textediting` renders and is discarded; only
+  `textinput` changes a value.
+- **The runtime does not write the value.** Committed text reaches the
+  application as an ordinary event, and the application decides what the value
+  becomes — the same single mutation door (D-1) every other UI change uses.
+
+### Window contract
+
+`window.Window` gains `StartTextInput()` / `StopTextInput()`. The frame loop
+starts text input when the focused node is editable and stops it when focus
+leaves, so the platform is never asked for text it has no recipient for. A
+backend that cannot deliver text reports an explicit error rather than
+accepting a start that produces nothing (P4).
+
+### Divergences
+
+- **No caret and no selection rendering.** The composition extent travels with
+  the event so a future caret renderer has what it needs; nothing draws it.
+- **No IME candidate window.** That is platform UI, outside the render pipeline.
+- **Deletion is the application's job.** Backspace arrives as `key-down`; the
+  handler rewrites the value and submits ops.
+- **Text input follows focus**, so ordinary keys are unaffected: without an
+  editable node the runtime never starts text input.
+
+Evidence: [`input_text_test.go`](../internal/app/input_text_test.go),
+[`reactivity_test.go`](../internal/app/reactivity_test.go).

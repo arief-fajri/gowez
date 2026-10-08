@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/arief-fajri/gowez/internal/observe"
+	"github.com/arief-fajri/gowez/internal/render"
+	"github.com/arief-fajri/gowez/internal/window"
 )
 
 // State is the application lifecycle state.
@@ -46,6 +48,25 @@ type App struct {
 	state    State
 	metrics  *observe.Recorder
 	reporter observe.Reporter
+}
+
+// scene is the per-frame surface a mounted UI provides. Two implementations
+// exist: the demo scene (M1–M4, hand-built in Go) and the bundle scene (M5,
+// built by JavaScript through ui.apply). The frame loop only sees this
+// interface, so the two paths cannot drift apart.
+type scene interface {
+	// Draw paints one frame at framebuffer size pw×ph for the given logical
+	// size logicalW×logicalH.
+	Draw(r render.Renderer, pw, ph, logicalW, logicalH int) error
+	// Tick advances per-frame state.
+	Tick()
+	// HandleInput feeds one window input event into the UI tree.
+	HandleInput(ev window.Event)
+	// FocusEditable reports whether the focused node accepts text input, and
+	// is how the loop decides to start or stop platform text input (M5).
+	FocusEditable() bool
+	// SetText writes committed or preedit text to the focused editable node.
+	SetText(text string)
 }
 
 // New validates options and creates an application in StateCreated.

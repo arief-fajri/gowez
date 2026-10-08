@@ -13,7 +13,8 @@ Guard rails hold only if they can be measured. A system property may not change 
 | Input | input events, dispatched handlers, unhandled events, recovered handler panics | `internal/app`, `internal/ui`, `internal/observe` | M3 ✓ (`InputEvents`, `DispatchedEvents`, `UnhandledEvents`, `HandlerPanics`) |
 | JS | eval/handler duration, isolated exceptions | `internal/script`, `internal/observe` | M4 ✓ (`JSExceptions`, `LastJSEvalDuration`, `Diagnostic{Component:"script"}`) |
 | IPC | invocation count, error count, duration | `internal/ipc`, `internal/observe` | M4 ✓ (`IPCCount`, `IPCErrorCount`, `LastIPCDuration`) |
-| Resource | memory, CPU, GPU/resource failures | `internal/observe` | M5+ |
+| UI ops | instruction batches submitted, ops applied, batches rejected | `internal/ui`, `internal/app`, `internal/observe` | M5 ✅ (`UIOpBatches`, `UIOpsApplied`, `UIOpsRejected`, `Diagnostic{Component:"ui"}` on rejection) |
+| Resource | memory, CPU, GPU/resource failures | `internal/observe` | M6 |
 
 Collection surface: `observe.Recorder` (`internal/observe`). Wiring each event happens with its milestone.
 

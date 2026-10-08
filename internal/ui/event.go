@@ -16,6 +16,14 @@ const (
 	KeyDown
 	// KeyUp is a key release.
 	KeyUp
+	// TextInput is committed Unicode text from the platform text-input
+	// source (Milestone 5). It carries text, never a keycode: layout never
+	// derives characters from keys.
+	TextInput
+	// TextEditing is IME composition (preedit) text plus the composition
+	// window's cursor/selection extent. Preedit is transient — it is
+	// rendered by the host and never committed as a value.
+	TextEditing
 )
 
 // String returns the event kind name for diagnostics.
@@ -33,6 +41,10 @@ func (k EventKind) String() string {
 		return "key-down"
 	case KeyUp:
 		return "key-up"
+	case TextInput:
+		return "textinput"
+	case TextEditing:
+		return "textediting"
 	default:
 		return "event"
 	}
@@ -87,6 +99,14 @@ type Event struct {
 	Button int
 	// Modifier is a ModShift|ModCtrl|ModAlt|ModMeta bitfield.
 	Modifier int
+	// Text carries the committed or preedit text for TextInput and
+	// TextEditing events (Milestone 5). It is empty for every other kind:
+	// characters are never derived from a keycode.
+	Text string
+	// TextStart and TextLength describe the IME composition window's extent
+	// within Text. They are zero when no composition is active.
+	TextStart  int
+	TextLength int
 	// stopped is set by StopPropagation; dispatch stops bubbling.
 	stopped bool
 }
@@ -118,6 +138,28 @@ func (t *Tree) AddEventListener(n *Node, kind EventKind, h Handler) ListenerID {
 	}
 	t.listeners[n.ID] = append(t.listeners[n.ID], listener{id: t.nextListenerID, kind: kind, fn: h})
 	return t.nextListenerID
+}
+
+// SetListenerHandler replaces the handler behind an existing registration
+// and reports whether the registration existed.
+//
+// It exists for the instruction applier: ApplyOps registers listeners
+// without knowing what should run on them, because the caller owns the
+// binding to the script layer (internal/script). The stream therefore fixes
+// which (node, kind) pair is live, and the caller supplies the behavior
+// afterwards. Replacing rather than removing-and-readding keeps the
+// registration order stable (docs/EVENTS.md §dispatch).
+func (t *Tree) SetListenerHandler(n *Node, id ListenerID, h Handler) bool {
+	if n == nil || id == 0 || h == nil {
+		return false
+	}
+	for i, l := range t.listeners[n.ID] {
+		if l.id == id {
+			t.listeners[n.ID][i].fn = h
+			return true
+		}
+	}
+	return false
 }
 
 // RemoveEventListener removes the registration id from n and reports

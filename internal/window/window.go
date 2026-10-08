@@ -69,8 +69,8 @@ func (PointerEvent) isWindowEvent() {}
 
 // KeyEvent carries keyboard input. Key is the portable key name
 // (docs/EVENTS.md §key naming — unknown keys are reported as
-// "#<keycode>", never dropped silently); Modifier is a ModShift|ModCtrl
-// |ModAlt|ModMeta bitfield; Repeat reports an OS key-repeat press.
+// "#<keycode>", never dropped silently); Modifier is a ModShift|ModCtrl|
+// ModAlt|ModMeta bitfield; Repeat reports an OS key-repeat press.
 type KeyEvent struct {
 	Key      string
 	Press    bool
@@ -79,6 +79,52 @@ type KeyEvent struct {
 }
 
 func (KeyEvent) isWindowEvent() {}
+
+// TextInputEvent carries committed Unicode text produced by the platform
+// text-input source (Milestone 5).
+//
+// It is deliberately text, not a keycode: characters never come from layout.
+// IME composition arrives separately as TextEditingEvent, so a committed
+// value is never contaminated by preedit. Events are only produced while
+// text input is active for the window (StartTextInput).
+type TextInputEvent struct {
+	Text string
+}
+
+func (TextInputEvent) isWindowEvent() {}
+
+// textInputSupport records whether a backend can deliver platform text input.
+// A backend that cannot must report it explicitly rather than accepting a
+// Start that produces no events, which would look like a keyboard fault in the
+// application (P4).
+type textInputSupport interface {
+	textInputSupported() bool
+}
+
+// TextInputSupported reports whether the platform behind this window can
+// deliver text input and IME composition. It answers "can this platform do
+// text input at all", not "is text input currently active" — the latter is
+// internal to the frame loop.
+func TextInputSupported(w Window) bool {
+	s, ok := w.(textInputSupport)
+	return !ok || s.textInputSupported()
+}
+
+// TextEditingEvent carries IME composition (preedit) text for the focused
+// editable node (Milestone 5).
+//
+// Start and Length describe the composition window's cursor/selection extent
+// inside Text. The runtime renders the preedit and discards it; only
+// TextInputEvent commits a value. This is the documented divergence from
+// browsers, where the candidate window is part of the platform UI — the
+// candidate window is out of scope for M5 (docs/EVENTS.md).
+type TextEditingEvent struct {
+	Text   string
+	Start  int
+	Length int
+}
+
+func (TextEditingEvent) isWindowEvent() {}
 
 // Window is the contract every platform backend implements.
 //
@@ -111,6 +157,17 @@ type Window interface {
 	// resolved by stretching (1:1 when the scene lays out in pixel
 	// units).
 	Present(pixels []byte, width, height int) error
+	// StartTextInput begins delivering TextInputEvent and TextEditingEvent
+	// for the window. The runtime calls it when an editable node gains
+	// focus and StopTextInput when it loses it or the window closes
+	// (Milestone 5, docs/EVENTS.md §text input).
+	//
+	// Both are non-blocking and idempotent: a backend that cannot deliver
+	// text reports an explicit error rather than silently dropping input.
+	StartTextInput() error
+	// StopTextInput stops text input delivery. Safe to call when text input
+	// is not active.
+	StopTextInput() error
 }
 
 // New creates the platform window backend (Milestone 1).

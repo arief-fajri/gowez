@@ -259,3 +259,42 @@ func (t *Tree) pruneInteraction(n *Node) {
 		t.pressedButton = 0
 	}
 }
+
+// TextInput delivers committed text to the focused node only.
+//
+// Text events are not dispatched by hit testing: they belong to whichever node
+// holds keyboard focus, because that is the node whose value is being edited.
+// The payload is text, never a keycode — characters never come from layout
+// (docs/EVENTS.md §text input).
+func (t *Tree) TextInput(text string) InputResult {
+	return t.Text(TextInput, text, 0, 0)
+}
+
+// TextEditing delivers IME preedit to the focused node. Preedit is transient
+// and never committed; only TextInput commits a value.
+func (t *Tree) TextEditing(text string, start, length int) InputResult {
+	return t.Text(TextEditing, text, start, length)
+}
+
+// Text dispatches one text event to the focused node.
+//
+// It is a separate entry point rather than a Dispatch special case because the
+// target is decided by focus, not by geometry — a pointer event over an
+// unrelated element must not redirect typing into it.
+func (t *Tree) Text(kind EventKind, text string, start, length int) InputResult {
+	if t.focus == nil {
+		// No editable node: the event is unhandled, not an error (I6).
+		return InputResult{}
+	}
+	dispatched, panics := t.Dispatch(&Event{
+		Kind:       kind,
+		Target:     t.focus,
+		Text:       text,
+		TextStart:  start,
+		TextLength: length,
+	})
+	var res InputResult
+	res.add(dispatched, panics)
+	res.Changed = dispatched > 0
+	return res
+}

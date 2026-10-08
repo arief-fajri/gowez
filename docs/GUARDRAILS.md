@@ -8,7 +8,7 @@ Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement 
 | ID | Guard rail | Enforcement (planned) |
 |---|---|---|
 | G-DATA-01 | Atomic state updates have an explicit boundary | ✅ ui tree mutation tests ([tree_test.go](../internal/ui/tree_test.go), [ui_test.go](../internal/ui/ui_test.go)), interaction state transitions ([interaction_test.go](../internal/ui/interaction_test.go)) |
-| G-DATA-02 | Failed operations never partially apply state | failure experiment D |
+| G-DATA-02 | Failed operations never partially apply state | ✅ applier two-phase validation ([apply.go](../internal/ui/apply.go), `TestApplyOpsAtomicRejectsInvalidStream`, `TestSessionRejectedBatchKeepsState`); failure experiment D (native state) still pending — M6 |
 | G-DATA-03 | Persisted state has a format/version | M6 persistence tests |
 | G-DATA-04 | Destructive native operations require an explicit API call | api/registry review + tests |
 
@@ -29,8 +29,8 @@ Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement 
 | G-IFACE-01 | The public Go API has a documented contract | gowez.go docs + API tests |
 | G-IFACE-02 | The UI ↔ Go IPC contract has a schema/version | ✅ `protocol/ipc.schema.json` + `ipcVersion` drift guard ([dispatcher_test.go](../internal/ipc/dispatcher_test.go)) |
 | G-IFACE-03 | Breaking changes are explicit (version bump + regression test) | schema `version` field |
-| G-IFACE-04 | Unsupported browser APIs are never treated as supported | adapter compile errors |
-| G-IFACE-05 | The supported Svelte compatibility range is documented | M5 docs |
+| G-IFACE-04 | Unsupported browser APIs are never treated as supported | ✅ adapter compile errors ([findings.ts](../packages/adapter/src/findings.ts), one test per rejected construct) + generated [gap register](SVELTE.md#gap-register) |
+| G-IFACE-05 | The supported Svelte compatibility range is documented | ✅ [SVELTE.md §Svelte compatibility](SVELTE.md#svelte-compatibility); manifest carries the major version, the runtime refuses a mismatch at startup |
 
 ## G-SEC — security
 
@@ -57,13 +57,15 @@ Guard rails are absolute: a violation is a defect, not a trade-off. Enforcement 
 | ID | Guard rail | Enforcement (planned) |
 |---|---|---|
 | G-UPG-01 | Runtime API changes are documented | this file + README |
-| G-UPG-02 | The Svelte compatibility range is tested | M5 integration tests |
+| G-UPG-02 | The Svelte compatibility range is tested | ✅ `TestBundleManifestSvelteRangeMismatch` (Go) + `bundle.test.ts` target/format assertions (adapter) |
 | G-UPG-03 | Renderer backends are swappable without changing the UI API | dual-backend tests (software + opengl) |
-| G-UPG-04 | Divergence from browser semantics is documented | ✅ CSS subset divergence ([CSS-SUBSET.md](CSS-SUBSET.md)) + style errors carry `style: line X:Y` ([style_test.go](../internal/style/style_test.go)); browser API docs → adapter (M5) |
+| G-UPG-04 | Divergence from browser semantics is documented | ✅ CSS subset divergence ([CSS-SUBSET.md](CSS-SUBSET.md)) + style errors carry `style: line X:Y` ([style_test.go](../internal/style/style_test.go)); Svelte/browser divergence table ([SVELTE.md §Divergences](SVELTE.md#divergences-from-browser-and-svelte-semantics)), one test per rejected construct |
 
 ## Changelog
 
 Record every breaking change to `protocol/` schemas or the root public API here (G-IFACE-03). Format: `YYYY-MM-DD — description — version bump old → new`.
 
+- 2026-10-08 — **M5 bundle mutation door**: the bundle path registers exactly one UI mutation method, `ui.apply`; node addressability is adapter-allocated ids inside validated op batches, never ambient tree access. `ui.setText` is scoped to the demo scene and is *not* registered when a bundle is loaded, so one door stays auditable (pinned by `TestBundleSceneRegistersOnlyUIApply`).
 - 2026-10-03 — module path renamed `github.com/volantisfrontend/gowez` → `github.com/arief-fajri/gowez` — pre-release (no tags, no consumers), no version bump ([DRR-003](../evidence/records/2026-10-03_module-path-rename.md))
+- 2026-10-08 — **M5**: root public API gains one additive optional field, `gowez.Config.UI fs.FS` (the compiled Svelte bundle), plus the bundle layout `{manifest.json, app.js, styles.css}` — pre-release (no tags, no external consumers), no version bump ([DRR-006](../evidence/records/2026-10-07_m5-ui-bundle-config.md)). `protocol/` unchanged: the manifest is validated by Go code that is stricter than the schema where they differ. New dev dependencies `esbuild` and `vitest`, build-time only ([DRR-005](../evidence/records/2026-10-07_m5-js-toolchain.md)). Reactivity model recorded in [SVELTE.md §Reactivity model](SVELTE.md#reactivity-model).
 - 2026-10-07 — `ipc.schema.json` error-code description extended with `-32600` (version mismatch) and clarified the `-32601` wording — additive description only, no shape/version change, no version bump (recorded under [DRR-004](../evidence/records/2026-10-07_js-engine-goja.md))

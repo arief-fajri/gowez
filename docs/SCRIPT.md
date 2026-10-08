@@ -99,8 +99,12 @@ declare state once (`var sceneState = …`) and handlers share it.
   no `process`/`Go` bindings. Unsupported access throws a normal
   `ReferenceError` — explicit, not silently stubbed.
 - **No memory limit API** (above). **No second thread / Worker.**
-- **Text input and IME are not part of the host** — deferred to M5
-  (decision 2026-10-07, [EVENTS.md](EVENTS.md)).
+- **Text input and IME *are* part of the host since M5** — the runtime starts
+  platform text input when an editable node gains focus and stops it on blur.
+  Committed text arrives as a `textinput` event carrying text (never a
+  keycode); IME composition arrives as `textediting`. Deletion is the
+  application's job: Backspace arrives as `key-down`
+  ([EVENTS.md](EVENTS.md), [SVELTE.md](SVELTE.md)).
 
 ## Observability (P5)
 
@@ -109,6 +113,7 @@ declare state once (`var sceneState = …`) and handlers share it.
 | `JSExceptions` | failed `Eval` / `FireHandler` (missing-handler misses excluded) |
 | `LastJSEvalDuration` | every `Eval`, always recorded |
 | `IPCCount`, `IPCErrorCount`, `LastIPCDuration` | every dispatcher round trip |
+| `UIOpBatches`, `UIOpsApplied`, `UIOpsRejected` | every `ui.apply` (M5) |
 | `Diagnostic{Component:"script"}` | JS failure with source + stack |
 
 ## Evidence

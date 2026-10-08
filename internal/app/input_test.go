@@ -187,6 +187,11 @@ type fakeWindow struct {
 	idx      int
 	presents int
 	w, h     int
+	// textStarted/textStopped record the platform text-input lifecycle
+	// transitions the loop drives from focus (Milestone 5).
+	textStarted int
+	textStopped int
+	textActive  bool
 }
 
 func (f *fakeWindow) Title() string         { return "fake" }
@@ -207,6 +212,18 @@ func (f *fakeWindow) Pump() []window.Event {
 
 func (f *fakeWindow) Present(px []byte, w, h int) error {
 	f.presents++
+	return nil
+}
+
+func (f *fakeWindow) StartTextInput() error {
+	f.textStarted++
+	f.textActive = true
+	return nil
+}
+
+func (f *fakeWindow) StopTextInput() error {
+	f.textStopped++
+	f.textActive = false
 	return nil
 }
 
@@ -267,7 +284,7 @@ func TestLoopRecoversHandlerPanic(t *testing.T) {
 	rec := &captureReporter{}
 	a.reporter = rec
 	scene := newTestScene(t, a.metrics, nil)
-	a.wireScenePanic(scene)
+	a.wireTreePanic(scene.tree)
 	btn := findTag(t, scene.tree, "button")
 	scene.tree.AddEventListener(btn, ui.Click, func(*ui.Event) { panic("handler boom") })
 	cx, cy := warmUp(t, scene, 400, 300)

@@ -3,8 +3,10 @@
 package window
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/Zyko0/go-sdl3/bin/binsdl"
 	"github.com/Zyko0/go-sdl3/sdl"
@@ -18,6 +20,32 @@ const maxEventsPerPump = 256
 // unloader is the (unexported) type returned by binsdl.Load.
 type unloader interface{ Unload() }
 
+// processLib is the embedded SDL3 shared library, mapped exactly once per
+// process.
+//
+// binsdl.Load() writes the library into a *fresh* temp directory and dlopens it,
+// so calling it per window extracts a second copy and registers every Objective-C
+// class twice. macOS reports that as duplicate classes and warns of "spurious
+// casting failures and mysterious crashes" — observed when the integration suite
+// opened a second window (2026-10-08).
+//
+// The library is a process-lifetime dependency: window-scoped resources
+// (texture, renderer, window, video init) are still released by Close, which is
+// what invariant I12 is about. Unloading the library with the window would leave
+// any later window with a closed library and a re-extracted duplicate.
+var (
+	processLibOnce sync.Once
+	processLib     unloader
+)
+
+// loadProcessLib maps the embedded library on first use and returns it
+// thereafter. It must be called from the OS main thread, like everything else
+// that touches SDL.
+func loadProcessLib() unloader {
+	processLibOnce.Do(func() { processLib = binsdl.Load() })
+	return processLib
+}
+
 // sdlWindow implements Window on top of SDL3 loaded through purego —
 // no cgo, shared libraries embedded in the binary (DRR-001).
 //
@@ -25,8 +53,6 @@ type unloader interface{ Unload() }
 // thread); there is no internal locking because the contract forbids
 // cross-goroutine use.
 type sdlWindow struct {
-	lib unloader
-
 	title    string
 	logicalW int
 	logicalH int
@@ -49,11 +75,13 @@ func newPlatformWindow(opts Options) (Window, error) {
 	if opts.Width <= 0 || opts.Height <= 0 {
 		return nil, fmt.Errorf("window: invalid size %dx%d", opts.Width, opts.Height)
 	}
-	lib := binsdl.Load()
-	w := &sdlWindow{lib: lib, title: opts.Title, logicalW: opts.Width, logicalH: opts.Height}
+	lib := loadProcessLib()
+	w := &sdlWindow{title: opts.Title, logicalW: opts.Width, logicalH: opts.Height}
 
 	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
-		lib.Unload()
+		// The library stays mapped: it is process-scoped, and unloading it
+		// here would leave a later window with a closed library.
+		_ = lib
 		return nil, fmt.Errorf("window: init video (main thread required): %w", err)
 	}
 	w.inited = true
@@ -132,10 +160,8 @@ func (w *sdlWindow) Close() {
 		sdl.Quit()
 		w.inited = false
 	}
-	if w.lib != nil {
-		w.lib.Unload()
-		w.lib = nil
-	}
+	// The shared library is deliberately *not* unloaded here: it is mapped once
+	// per process and stays available for any later window (see loadProcessLib).
 }
 
 // Pump drains the SDL event queue into window events. Non-blocking and
@@ -182,6 +208,23 @@ func mapEvent(ev *sdl.Event) (Event, bool) {
 	case sdl.EVENT_KEY_DOWN, sdl.EVENT_KEY_UP:
 		if k := ev.KeyboardEvent(); k != nil {
 			return KeyEvent{Key: keyName(k.Key), Press: k.Down, Modifier: mapModifiers(k.Mod), Repeat: k.Repeat}, true
+		}
+
+	case sdl.EVENT_TEXT_INPUT:
+		// Committed text (Milestone 5). An empty string is SDL's text-input
+		// shutdown request, not a commit, so it is dropped.
+		if te := ev.TextInputEvent(); te != nil && te.Text != "" {
+			return TextInputEvent{Text: te.Text}, true
+		}
+
+	case sdl.EVENT_TEXT_EDITING:
+		// IME composition (preedit) plus the composition window extent.
+		if te := ev.TextEditingEvent(); te != nil {
+			return TextEditingEvent{
+				Text:   te.Text,
+				Start:  int(te.Start),
+				Length: int(te.Length),
+			}, true
 		}
 	}
 	return nil, false
@@ -275,6 +318,35 @@ func keyName(k sdl.Keycode) string {
 
 // Present uploads one frame and flips it to the screen. The texture is
 // (re)created when the frame size changes — the HiDPI resize path.
+// StartTextInput begins delivering committed text and IME composition for
+// the window (Milestone 5). SDL3 gates both event kinds behind this call, so
+// text only arrives while an editable node holds focus.
+func (w *sdlWindow) StartTextInput() error {
+	if w.closed || w.win == nil {
+		return errors.New("window: text input on a closed window")
+	}
+	if err := w.win.StartTextInput(); err != nil {
+		return fmt.Errorf("window: start text input: %w", err)
+	}
+	return nil
+}
+
+// StopTextInput stops text delivery. Safe to call when text input is not
+// active, which is why the runtime can call it unconditionally on blur.
+func (w *sdlWindow) StopTextInput() error {
+	if w.closed || w.win == nil {
+		return nil
+	}
+	if err := w.win.StopTextInput(); err != nil {
+		return fmt.Errorf("window: stop text input: %w", err)
+	}
+	return nil
+}
+
+// textInputSupported reports that the SDL backend delivers text input and IME
+// composition (EVENT_TEXT_INPUT / EVENT_TEXT_EDITING are mapped in mapEvent).
+func (w *sdlWindow) textInputSupported() bool { return true }
+
 func (w *sdlWindow) Present(pixels []byte, width, height int) error {
 	if w.closed {
 		return fmt.Errorf("window: present after close")

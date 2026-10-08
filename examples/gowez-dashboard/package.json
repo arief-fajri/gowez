@@ -1,0 +1,15 @@
+{
+  "name": "@gowez/example-gowez-dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runnable GoWEZ acceptance sample: an in-subset Svelte slice mounted by the Go runtime.",
+  "type": "module",
+  "scripts": {
+    "build": "node ../../packages/adapter/dist/cli.cjs build --root . --entry src/App.svelte --out dist",
+    "report": "node ../../packages/adapter/dist/cli.cjs report --root . --entry src/App.svelte"
+  },
+  "dependencies": {
+    "@gowez/adapter": "*",
+    "svelte": "^5.57.2"
+  }
+}

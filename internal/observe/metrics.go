@@ -37,6 +37,15 @@ type Metrics struct {
 	// HandlerPanics is handler faults recovered by dispatch
 	// (docs/EVENTS.md §handler contract).
 	HandlerPanics uint64
+	// UIOpBatches is the number of UI instruction batches submitted
+	// (Milestone 5). One batch is one ui.apply call.
+	UIOpBatches uint64
+	// UIOpsApplied is the number of individual ops that were applied.
+	UIOpsApplied uint64
+	// UIOpsRejected is the number of batches refused by validation. A
+	// non-zero value means a stream reached the runtime malformed; each one
+	// also produces a Diagnostic{Component:"ui"} (P5).
+	UIOpsRejected uint64
 }
 
 // Recorder is a minimal in-process metrics sink. It is safe for concurrent
@@ -119,6 +128,21 @@ func (r *Recorder) RecordInput(dispatched, panics int) {
 	if panics > 0 {
 		r.m.HandlerPanics += uint64(panics)
 	}
+}
+
+// RecordUIBatch counts one submitted UI instruction batch. applied is the
+// number of ops that took effect, rejected reports whether validation refused
+// the batch — a rejected batch applies nothing (invariant I1), so applied is
+// zero in that case (Module 5 §5.1: UI mutation observability).
+func (r *Recorder) RecordUIBatch(applied int, rejected bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.m.UIOpBatches++
+	if rejected {
+		r.m.UIOpsRejected++
+		return
+	}
+	r.m.UIOpsApplied += uint64(applied)
 }
 
 // Snapshot returns a consistent copy of the current metrics.

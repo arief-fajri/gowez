@@ -2,9 +2,16 @@
   "name": "gowez",
   "version": "0.0.0",
   "private": true,
-  "description": "Go-native desktop application runtime — Svelte UI, no Chromium, no OS WebView.",
+  "description": "Go-native desktop application runtime \u2014 Svelte UI, no Chromium, no OS WebView.",
   "workspaces": [
     "packages/*",
     "examples/*"
-  ]
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build:adapter": "npm run build -w @gowez/adapter && npm run bundle:cli -w @gowez/adapter",
+    "build:sample": "npm run build -w @gowez/example-gowez-dashboard",
+    "report:dashboard": "node packages/adapter/dist/cli.cjs report --root examples/dashboard --entry src/App.svelte"
+  }
 }

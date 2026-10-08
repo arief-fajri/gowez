@@ -1,0 +1,89 @@
+.list.s-UserList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.row.s-UserList {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  background-color: #202430;
+}
+.name.s-UserList {
+  color: #ffffff;
+  font-size: 14px;
+}
+.role.s-UserList {
+  color: #8b93a7;
+  font-size: 12px;
+}
+button.s-UserList {
+  background-color: #2b303b;
+  color: #ffffff;
+  padding: 4px 8px;
+}
+.shell.s-App {
+  display: flex;
+  flex-direction: column;
+  height: 600px;
+  background-color: #1b1f27;
+  color: #dfe4ee;
+}
+.bar.s-App {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background-color: #1e2028;
+}
+.brand.s-App {
+  color: #ffffff;
+  font-size: 20px;
+}
+nav.s-App {
+  display: flex;
+  gap: 6px;
+}
+.body.s-App {
+  display: flex;
+  flex-grow: 1;
+}
+.side.s-App {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background-color: #1a1c24;
+}
+main.s-App {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+input.s-App {
+  height: 24px;
+  background-color: #202430;
+  color: #dfe4ee;
+  padding: 4px;
+  border-width: 1px;
+  border-color: #333945;
+}
+label.s-App {
+  color: #8b93a7;
+  font-size: 12px;
+}
+.count.s-App {
+  color: #e0873a;
+  font-size: 28px;
+}
+.hint.s-App {
+  color: #6fcf97;
+  font-size: 12px;
+}
+button.s-App {
+  background-color: #2b303b;
+  color: #ffffff;
+  padding: 6px 10px;
+}

@@ -10,6 +10,22 @@ import (
 	"github.com/arief-fajri/gowez/internal/script"
 )
 
+// newRuntimeWithLimits is newRuntime with explicit engine limits, so a test
+// can tighten the eval budget and prove that an over-budget mount aborts
+// startup explicitly instead of running forever (G-REL-01, I10).
+func newRuntimeWithLimits(metrics *observe.Recorder, reporter observe.Reporter, limits script.Limits) (*ipc.Dispatcher, script.Engine, error) {
+	disp, _, err := newRuntime(metrics, reporter)
+	if err != nil {
+		return nil, nil, err
+	}
+	eng, err := script.New(limits, disp)
+	if err != nil {
+		return nil, nil, err
+	}
+	eng.SetObservation(metrics, reporter)
+	return disp, eng, nil
+}
+
 // newRuntime builds the IPC dispatcher and the embedded JS engine — the
 // "JS runtime" step of the startup sequence (docs/PLATFORM.md: config →
 // window → renderer → JS runtime → scene → ready).

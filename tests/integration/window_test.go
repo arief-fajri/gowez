@@ -12,25 +12,43 @@ import (
 	"github.com/arief-fajri/gowez/internal/window"
 )
 
-// lifecycleErr is set by TestMain before m.Run.
-var lifecycleErr error
+// lifecycleErr and dashboardErr are set by TestMain before m.Run: the two
+// GUI checks that must execute on the OS main thread.
+var (
+	lifecycleErr error
+	dashboardErr error
+)
 
-// TestMain runs the SDL lifecycle check on the OS main thread.
+// TestMain runs the SDL lifecycle check and the dashboard window check on the
+// OS main thread.
 //
-// SDL/Cocoa refuses to initialize from any other goroutine: go test
-// executes each Test function on a worker goroutine, so the check must
-// live here, before m.Run (verified by experiment — see
-// evidence/learnings.md). runtime.LockOSThread pins this goroutine to
-// the main thread even across the park inside m.Run.
+// SDL/Cocoa refuses to initialize from any other goroutine: go test executes
+// each Test function on a worker goroutine, so these checks must live here,
+// before m.Run (verified by experiment — see evidence/learnings.md).
+// runtime.LockOSThread pins this goroutine to the main thread even across the
+// park inside m.Run.
+//
+// Go permits exactly one TestMain per package, so both checks are sequenced
+// here and surfaced to the reporter as declarative tests below.
 func TestMain(m *testing.M) {
 	runtime.LockOSThread()
+
 	lifecycleErr = runWindowLifecycle()
-	if lifecycleErr == nil {
-		fmt.Fprintln(os.Stderr, "window lifecycle: OK (open, present×2, pump, close)")
-	}
-	code := m.Run()
 	if lifecycleErr != nil {
 		fmt.Fprintf(os.Stderr, "window lifecycle: %v\n", lifecycleErr)
+	} else {
+		fmt.Fprintln(os.Stderr, "window lifecycle: OK (open, present×2, pump, close)")
+	}
+
+	// The dashboard check runs even when the lifecycle check failed: a window
+	// that opened but could not present is a different defect from one that
+	// never opened, and both are worth reporting.
+	if lifecycleErr == nil {
+		dashboardErr = runDashboardWindow()
+	}
+
+	code := m.Run()
+	if lifecycleErr != nil || dashboardErr != nil {
 		if code == 0 {
 			code = 1
 		}
@@ -45,6 +63,18 @@ func TestMain(m *testing.M) {
 func TestWindowLifecycle(t *testing.T) {
 	if lifecycleErr != nil {
 		t.Fatalf("window lifecycle failed in TestMain: %v", lifecycleErr)
+	}
+}
+
+// TestDashboardWindowMounts is the M5 platform proof: the compiled Svelte
+// bundle mounted into a real OS window, frames presented, no rejected op
+// batches. See runDashboardWindow.
+func TestDashboardWindowMounts(t *testing.T) {
+	if lifecycleErr != nil {
+		t.Skipf("window lifecycle failed in TestMain (%v); the dashboard check was not run", lifecycleErr)
+	}
+	if dashboardErr != nil {
+		t.Fatalf("dashboard window check failed in TestMain: %v", dashboardErr)
 	}
 }
 

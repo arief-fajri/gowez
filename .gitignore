@@ -1,9 +1,17 @@
 .DS_Store
 node_modules/
 dist/
+# The M5 slice bundle is committed so the Go golden/bundle/integration tests run
+# offline without npm. The negation is deliberately narrow: the browser sample's
+# build output stays ignored.
+!examples/gowez-dashboard/dist/
+!examples/gowez-dashboard/dist/**
 build/
 bin/
 *.exe
 *.test
 *.out
 /gowez
+
+# `go build ./...` writes package main binaries into the working directory.
+/gowez-dashboard

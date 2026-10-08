@@ -1,5 +1,7 @@
 package ui
 
+import "strings"
+
 // NodeID identifies a node within a Tree.
 type NodeID int
 
@@ -65,4 +67,24 @@ func (n *Node) GetAttribute(name string) string {
 		return ""
 	}
 	return n.Attrs[name]
+}
+
+// HasClass reports whether the node's class attribute contains token.
+//
+// The class attribute is a whitespace-separated token list, not a single value,
+// so it must be compared per token: an equality test on the whole attribute
+// silently stops matching as soon as anything else joins the list. Component
+// style scoping appends a scope class to every element, which is exactly what
+// breaks such a test. Matching mirrors internal/style, which tokenizes the same
+// way.
+func (n *Node) HasClass(token string) bool {
+	if token == "" {
+		return false
+	}
+	for _, have := range strings.Fields(n.GetAttribute("class")) {
+		if have == token {
+			return true
+		}
+	}
+	return false
 }
